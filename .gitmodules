@@ -1,0 +1,3 @@
+[submodule "bybit-rust-sdk/bybit-api"]
+	path = bybit-rust-sdk/bybit-api
+	url = https://github.com/tiagosiebler/bybit-api
