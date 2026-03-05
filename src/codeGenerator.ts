@@ -343,6 +343,59 @@ export function convertTypeAlias(typeName: string, typeNode: Node, jsDocs: JSDoc
     const compactTypeText = typeText.replace(/\s+/g, ' ').trim();
     const preview = compactTypeText.length > 100 ? compactTypeText.substring(0, 100) + '...' : compactTypeText;
 
+    // Handle generic instantiation aliases: type X = SomeGeneric<A, B, C>
+    // These are concrete uses of generic types (e.g., WS event types)
+    const genericInstMatch = compactTypeText.match(/^([A-Z]\w*)<(.+)>$/);
+    if (genericInstMatch) {
+        const [, baseName, argsStr] = genericInstMatch;
+        
+        // Convert generic args to Rust types (simple mapping)
+        const convertGenericArg = (arg: string): string => {
+            arg = arg.trim();
+            // String literal union like 'delta' | 'snapshot'
+            if (arg.includes("'") || arg.includes('"')) {
+                return "String";
+            }
+            if (arg === "string") return "String";
+            if (arg === "number") return "f64";
+            if (arg === "boolean") return "bool";
+            if (arg.endsWith("[]")) {
+                const inner = convertGenericArg(arg.slice(0, -2).trim());
+                return `Vec<${inner}>`;
+            }
+            // Union of types like T1 | T2 | T3
+            if (arg.includes(" | ")) {
+                return "serde_json::Value";
+            }
+            // Named type — pass through
+            return arg;
+        };
+
+        // Parse args respecting nested angle brackets
+        const args: string[] = [];
+        let depth = 0;
+        let current = "";
+        for (const ch of argsStr) {
+            if (ch === '<') depth++;
+            else if (ch === '>') depth--;
+            else if (ch === ',' && depth === 0) {
+                args.push(current.trim());
+                current = "";
+                continue;
+            }
+            current += ch;
+        }
+        if (current.trim()) args.push(current.trim());
+
+        const rustArgs = args.map(convertGenericArg);
+        
+        const { docComment, isDeprecated } = convertJSDocToRust(jsDocs);
+        let rustCode = docComment;
+        if (isDeprecated) rustCode += `#[deprecated]\n`;
+        rustCode += `pub type ${typeName} = ${baseName}<${rustArgs.join(", ")}>;\n`;
+        return { code: rustCode };
+    }
+
     // Detect what kind of type alias this is
     let reason: string;
 

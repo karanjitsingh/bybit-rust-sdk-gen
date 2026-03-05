@@ -1,5 +1,5 @@
 // Auto-generated from TypeScript definitions
-// Source: /Users/karan/github/bybit-rust-sdk-gen/bybit-api/src/websocket-client.ts
+// Source: /local/home/kjsing/code/bybit-rust-sdk-gen/bybit-api/src/websocket-client.ts
 
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]

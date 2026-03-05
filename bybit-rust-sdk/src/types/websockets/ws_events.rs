@@ -7,6 +7,10 @@
 use serde::{Deserialize, Serialize};
 use derive_builder::Builder;
 
+use crate::types::response::v5_rfq::RFQItemV5;
+use crate::types::response::v5_rfq::RFQPublicTradeV5;
+use crate::types::response::v5_rfq::RFQQuoteItemV5;
+use crate::types::response::v5_rfq::RFQTradeV5;
 use crate::types::shared::inline::OrderParamsV5_MarketUnit;
 use crate::types::shared_v5::CategoryV5;
 use crate::types::shared_v5::ExecTypeV5;
@@ -24,6 +28,7 @@ use crate::types::shared_v5::PositionIdx;
 use crate::types::shared_v5::PositionSideV5;
 use crate::types::shared_v5::PositionStatusV5;
 use crate::types::shared_v5::StopOrderTypeV5;
+use crate::types::shared_v5::SystemStatusItemV5;
 use crate::types::shared_v5::TPSLModeV5;
 use crate::types::shared_v5::TradeModeV5;
 use crate::types::websockets::ws_general::WsKey;
@@ -31,32 +36,60 @@ use crate::types::websockets::ws_general::WsKey;
 // Import inline types from the submodule
 use self::inline::*;
 
-// ============================================================================
-// Skipped Type Aliases (21)
-// ============================================================================
-// The following type aliases were not converted. See reasons below:
-//
-// Type alias 'WSOrderbookEventV5' skipped: Generic type alias: WSPublicTopicEventV5< string, 'delta' | 'snapshot', WSOrderbookV5 >
-// Type alias 'WSTradeEventV5' skipped: Generic type alias: WSPublicTopicEventV5< string, 'snapshot', WSTradeV5[] >
-// Type alias 'WSTickerEventV5' skipped: Generic type alias: WSPublicTopicEventV5< string, 'snapshot' | 'delta', WSTickerV5 | WSTickerOptionV5 | WSTickerSpotV5 >
-// Type alias 'WSKlineEventV5' skipped: Generic type alias: WSPublicTopicEventV5< string, 'snapshot', WSKlineV5[] >
-// Type alias 'WSLiquidationEventV5' skipped: Generic type alias: WSPublicTopicEventV5< string, 'snapshot', WSLiquidationV5[] >
-// Type alias 'WSPositionEventV5' skipped: Generic type alias: WSPrivateTopicEventV5< 'position', WSPositionV5[] >
-// Type alias 'WSAccountOrderEventV5' skipped: Generic type alias: WSPrivateTopicEventV5< 'order', WSAccountOrderV5[] >
-// Type alias 'WSExecutionEventV5' skipped: Generic type alias: WSPrivateTopicEventV5< 'execution', WSExecutionV5[] >
-// Type alias 'WSExecutionFastEventV5' skipped: Generic type alias: WSPrivateTopicEventV5< 'execution.fast', WSExecutionFastV5[] >
-// Type alias 'WSWalletEventV5' skipped: Generic type alias: WSPrivateTopicEventV5<'wallet', WSWalletV5[]>
-// Type alias 'WSGreeksEventV5' skipped: Generic type alias: WSPrivateTopicEventV5<'greeks', WSGreeksV5[]>
-// Type alias 'WSSpreadOrderEventV5' skipped: Generic type alias: WSPrivateTopicEventV5< 'spread.order', WSSpreadOrderV5[] >
-// Type alias 'WSSpreadExecutionEventV5' skipped: Generic type alias: WSPrivateTopicEventV5< 'spread.execution', WSSpreadExecutionV5[] >
-// Type alias 'WSInsuranceEventV5' skipped: Generic type alias: WSPublicTopicEventV5< 'insurance.USDT' | 'insurance.USDC' | 'insurance.inverse', 'snapshot' | 'delta...
-// Type alias 'WSPriceLimitEventV5' skipped: Generic type alias: WSPublicTopicEventV5< string, 'snapshot', WSPriceLimitV5 >
-// Type alias 'WSADLAlertEventV5' skipped: Generic type alias: WSPublicTopicEventV5< 'adlAlert.USDT' | 'adlAlert.USDC' | 'adlAlert.inverse', 'snapshot', WSADLAlert...
-// Type alias 'WSSystemStatusEventV5' skipped: Generic type alias: WSPublicTopicEventV5< 'system.status', 'snapshot', SystemStatusItemV5[] >
-// Type alias 'WSRFQInquiryEventV5' skipped: Generic type alias: WSPrivateTopicEventV5< 'rfq.open.rfqs' | 'rfq.site.rfqs', RFQItemV5[] >
-// Type alias 'WSRFQQuoteEventV5' skipped: Generic type alias: WSPrivateTopicEventV5< 'rfq.open.quotes' | 'rfq.site.quotes', RFQQuoteItemV5[] >
-// Type alias 'WSRFQTradeEventV5' skipped: Generic type alias: WSPrivateTopicEventV5< 'rfq.open.trades' | 'rfq.site.trades', RFQTradeV5[] >
-// Type alias 'WSRFQPublicTradeEventV5' skipped: Generic type alias: WSPublicTopicEventV5< 'rfq.open.public.trades' | 'rfq.site.public.trades', 'snapshot', RFQPublicTrad...
+pub type WSOrderbookEventV5 = WSPublicTopicEventV5<String, String, WSOrderbookV5>;
+
+pub type WSTradeEventV5 = WSPublicTopicEventV5<String, String, Vec<WSTradeV5>>;
+
+pub type WSTickerEventV5 = WSPublicTopicEventV5<String, String, serde_json::Value>;
+
+pub type WSKlineEventV5 = WSPublicTopicEventV5<String, String, Vec<WSKlineV5>>;
+
+pub type WSLiquidationEventV5 = WSPublicTopicEventV5<String, String, Vec<WSLiquidationV5>>;
+
+pub type WSPositionEventV5 = WSPrivateTopicEventV5<String, Vec<WSPositionV5>>;
+
+pub type WSAccountOrderEventV5 = WSPrivateTopicEventV5<String, Vec<WSAccountOrderV5>>;
+
+pub type WSExecutionEventV5 = WSPrivateTopicEventV5<String, Vec<WSExecutionV5>>;
+
+pub type WSExecutionFastEventV5 = WSPrivateTopicEventV5<String, Vec<WSExecutionFastV5>>;
+
+pub type WSWalletEventV5 = WSPrivateTopicEventV5<String, Vec<WSWalletV5>>;
+
+pub type WSGreeksEventV5 = WSPrivateTopicEventV5<String, Vec<WSGreeksV5>>;
+
+pub type WSSpreadOrderEventV5 = WSPrivateTopicEventV5<String, Vec<WSSpreadOrderV5>>;
+
+pub type WSSpreadExecutionEventV5 = WSPrivateTopicEventV5<String, Vec<WSSpreadExecutionV5>>;
+
+pub type WSInsuranceEventV5 = WSPublicTopicEventV5<String, String, Vec<WSInsuranceV5>>;
+
+pub type WSPriceLimitEventV5 = WSPublicTopicEventV5<String, String, WSPriceLimitV5>;
+
+pub type WSADLAlertEventV5 = WSPublicTopicEventV5<String, String, Vec<WSADLAlertV5>>;
+
+pub type WSSystemStatusEventV5 = WSPublicTopicEventV5<String, String, Vec<SystemStatusItemV5>>;
+
+/// RFQ WebSocket Events
+/// RFQ Inquiry Channel
+/// Private push for RFQ inquiries sent or received by the user
+/// Topics: rfq.open.rfqs, rfq.site.rfqs
+pub type WSRFQInquiryEventV5 = WSPrivateTopicEventV5<String, Vec<RFQItemV5>>;
+
+/// RFQ Quote Channel
+/// Private push for quotes sent or received by the user
+/// Topics: rfq.open.quotes, rfq.site.quotes
+pub type WSRFQQuoteEventV5 = WSPrivateTopicEventV5<String, Vec<RFQQuoteItemV5>>;
+
+/// RFQ Trade Channel
+/// Private push for block trades executed by the user
+/// Topics: rfq.open.trades, rfq.site.trades
+pub type WSRFQTradeEventV5 = WSPrivateTopicEventV5<String, Vec<RFQTradeV5>>;
+
+/// RFQ Public Trade Channel
+/// Public push for all block trades
+/// Topics: rfq.open.public.trades, rfq.site.public.trades
+pub type WSRFQPublicTradeEventV5 = WSPublicTopicEventV5<String, String, Vec<RFQPublicTradeV5>>;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, Builder)]
 #[builder(setter(into, strip_option), default)]

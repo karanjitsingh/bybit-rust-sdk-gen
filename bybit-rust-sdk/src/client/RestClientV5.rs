@@ -1,5 +1,5 @@
 // Auto-generated from TypeScript definitions
-// Source: /Users/karan/github/bybit-rust-sdk-gen/bybit-api/src/rest-client-v5.ts
+// Source: /local/home/kjsing/code/bybit-rust-sdk-gen/bybit-api/src/rest-client-v5.ts
 
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
@@ -179,8 +179,8 @@ impl<'a> RestClientV5<'a> {
     /// Query a list of instruments of online trading pair.
     /// Covers: Spot / Linear contract / Inverse contract / Option
     /// Note: Spot does not support pagination, so limit & cursor are invalid.
-    pub async fn get_instruments_info(&self, params: GetInstrumentsInfoParamsV5) -> ClientResult<InstrumentInfoResponseV5<C>> {
-        self.base.get("/v5/market/instruments-info", Some(serde_json::to_value(params).unwrap_or_default())).await.and_then(|v| serde_json::from_value(v).map_err(|e| crate::client::ClientError::SerializationError(e.to_string())))
+    pub async fn get_instruments_info(&self, params: GetInstrumentsInfoParamsV5) -> ClientResult<serde_json::Value> {
+        self.base.get("/v5/market/instruments-info", Some(serde_json::to_value(params).unwrap_or_default())).await
     }
 
     /// Query orderbook data
@@ -200,8 +200,8 @@ impl<'a> RestClientV5<'a> {
 
     /// Query the latest price snapshot, best bid/ask price, and trading volume in the last 24 hours.
     /// Covers: Spot / Linear contract / Inverse contract / Option
-    pub async fn get_tickers(&self, params: GetTickersParamsV5<CategoryV5>) -> ClientResult<CategoryListV5<Vec<TickerLinearInverseV5>, Vec<serde_json::Value>, Vec<serde_json::Value>, String>> {
-        self.base.get("/v5/market/tickers", Some(serde_json::to_value(params).unwrap_or_default())).await.and_then(|v| serde_json::from_value(v).map_err(|e| crate::client::ClientError::SerializationError(e.to_string())))
+    pub async fn get_tickers(&self, params: GetTickersParamsV5<CategoryV5>) -> ClientResult<serde_json::Value> {
+        self.base.get("/v5/market/tickers", Some(serde_json::to_value(params).unwrap_or_default())).await
     }
 
     /// Query historical funding rate. Each symbol has a different funding interval.
@@ -366,7 +366,7 @@ impl<'a> RestClientV5<'a> {
     /// Only for institutional clients!
     /// If it doesn't work, use v2!
     pub async fn set_disconnect_cancel_all_window(&self, category: String, timeWindow: f64) -> ClientResult<()> {
-        self.base.post_private("/v5/order/disconnected-cancel-all", Some(serde_json::to_value(category).unwrap_or_default())).await
+        self.base.post_private("/v5/order/disconnected-cancel-all", Some(serde_json::to_value(category).unwrap_or_default())).await.map(|_| ())
     }
 
     /// This endpoint allows you to set the disconnection protect time window. Covers: option (unified account).
@@ -374,7 +374,7 @@ impl<'a> RestClientV5<'a> {
     /// The default time window is 10 seconds.
     /// Only for institutional clients!
     pub async fn set_disconnect_cancel_all_window_v2(&self, params: serde_json::Value) -> ClientResult<()> {
-        self.base.post_private("/v5/order/disconnected-cancel-all", Some(serde_json::to_value(params).unwrap_or_default())).await
+        self.base.post_private("/v5/order/disconnected-cancel-all", Some(serde_json::to_value(params).unwrap_or_default())).await.map(|_| ())
     }
 
     /// Pre-check order to calculate changes in IMR and MMR before placing an order
@@ -661,12 +661,12 @@ impl<'a> RestClientV5<'a> {
 
     /// Configure Market Maker Protection (MMP)
     pub async fn set_mmp(&self, params: MMPModifyParamsV5) -> ClientResult<()> {
-        self.base.post_private("/v5/account/mmp-modify", Some(serde_json::to_value(params).unwrap_or_default())).await
+        self.base.post_private("/v5/account/mmp-modify", Some(serde_json::to_value(params).unwrap_or_default())).await.map(|_| ())
     }
 
     /// Once the mmp triggered, you can unfreeze the account via this endpoint
     pub async fn reset_mmp(&self, baseCoin: String) -> ClientResult<()> {
-        self.base.post_private("/v5/account/mmp-reset", Some(serde_json::to_value(baseCoin).unwrap_or_default())).await
+        self.base.post_private("/v5/account/mmp-reset", Some(serde_json::to_value(baseCoin).unwrap_or_default())).await.map(|_| ())
     }
 
     /// Get MMP State
@@ -1346,7 +1346,7 @@ impl<'a> RestClientV5<'a> {
     /// INFO
     /// Use exchange broker master account to issue
     pub async fn issue_broker_voucher(&self, params: IssueVoucherParamsV5) -> ClientResult<()> {
-        self.base.post_private("/v5/broker/award/distribute-award", Some(serde_json::to_value(params).unwrap_or_default())).await
+        self.base.post_private("/v5/broker/award/distribute-award", Some(serde_json::to_value(params).unwrap_or_default())).await.map(|_| ())
     }
 
     /// Query an issued voucher
@@ -1546,22 +1546,29 @@ impl<'a> RestClientV5<'a> {
 
     /// Mark P2P order as paid
     pub async fn mark_p2_p_order_as_paid(&self, params: MarkP2POrderAsPaidParamsV5) -> ClientResult<()> {
-        self.base.post_private("/v5/p2p/order/pay", Some(serde_json::to_value(params).unwrap_or_default())).await
+        self.base.post_private("/v5/p2p/order/pay", Some(serde_json::to_value(params).unwrap_or_default())).await.map(|_| ())
     }
 
     /// Release digital assets in a P2P order
     pub async fn release_p2_p_order(&self, params: serde_json::Value) -> ClientResult<()> {
-        self.base.post_private("/v5/p2p/order/finish", Some(serde_json::to_value(params).unwrap_or_default())).await
+        self.base.post_private("/v5/p2p/order/finish", Some(serde_json::to_value(params).unwrap_or_default())).await.map(|_| ())
     }
 
     /// Send chat message in a P2P order
     pub async fn send_p2_p_order_message(&self, params: SendP2POrderMessageParamsV5) -> ClientResult<()> {
-        self.base.post_private("/v5/p2p/order/message/send", Some(serde_json::to_value(params).unwrap_or_default())).await
+        self.base.post_private("/v5/p2p/order/message/send", Some(serde_json::to_value(params).unwrap_or_default())).await.map(|_| ())
     }
 
-    /// Upload chat file for P2P order
-    pub async fn upload_p2_p_chat_file(&self, params: serde_json::Value) -> ClientResult<()> {
-        self.base.post_private("/v5/p2p/oss/upload_file", Some(serde_json::to_value(params).unwrap_or_default())).await
+    /// Upload chat file for P2P order (Node.js only)
+    /// Note: You must provide a Buffer. To upload from a file path, read it into a Buffer first:
+    /// \`\`\`typescript
+    /// import fs from 'fs';
+    /// const buffer = fs.readFileSync('./path/to/file.png');
+    /// await client.uploadP2PChatFile({ fileBuffer: buffer, fileName: 'file.png' });
+    /// \`\`\`
+    /// Supported file types: jpg, png, jpeg, pdf, mp4
+    pub async fn upload_p2_p_chat_file(&self, params: serde_json::Value) -> ClientResult<serde_json::Value> {
+        todo!("Method implementation: uploadP2PChatFile")
     }
 
     /// Get chat messages in a P2P order

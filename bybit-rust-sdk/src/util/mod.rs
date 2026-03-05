@@ -10,6 +10,9 @@ use derive_builder::Builder;
 use crate::types::shared::inline::MovePositionParamsV5_List_Category;
 use strum_macros::{EnumString, Display};
 
+// Import inline types from the submodule
+use self::inline::*;
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default, EnumString, Display)]
 pub enum SignEncodeMethod {
     #[default]
@@ -69,6 +72,13 @@ pub struct BybitEventV5<TData: Default> {
     pub wsKey: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default, Builder)]
+#[builder(setter(into, strip_option), default)]
+pub struct FileUploadRequestParams {
+    pub fileBuffer: serde_json::Value,
+    pub fileName: String,
+}
+
 /// Normalised internal format for a request (subscribe/unsubscribe/etc) on a topic, with optional parameters.
 /// - Topic: the topic this event is for
 /// - Payload: the parameters to include, optional. E.g. auth requires key + sign. Some topics allow configurable parameters.
@@ -108,3 +118,23 @@ pub struct MidflightWsRequestEvent<TEvent: Default> {
     pub requestEvent: TEvent,
 }
 
+// ============================================================================
+// Inline Types Submodule
+// ============================================================================
+// These types are inline unions/literals used only within this file
+
+pub mod inline {
+    use serde::{Deserialize, Serialize};
+    use strum_macros::{EnumString, Display};
+
+    /// `EmittableEvent:eventType`
+    #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default, EnumString, Display)]
+    pub enum EmittableEvent_EventType {
+        #[default]
+        authenticated,
+        exception,
+        response,
+        update,
+    }
+
+}

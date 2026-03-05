@@ -8,7 +8,7 @@ import { InlineTypeRegistry } from "./inlineTypeRegistry";
 import * as console from "./console";
 
 // Known external/library types that should become serde_json::Value
-const EXTERNAL_TYPES = ["WebSocket", "RestClientOptions", "EventEmitter"];
+const EXTERNAL_TYPES = ["WebSocket", "RestClientOptions", "EventEmitter", "Buffer"];
 
 export class TypeConverter {
     // Store generated inline object structs

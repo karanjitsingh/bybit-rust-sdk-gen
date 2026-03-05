@@ -220,6 +220,18 @@ function convertTypeToRust(
   const genericMatch = cleanType.match(/^([A-Za-z_]\w*)<(.+)>$/);
   if (genericMatch) {
     const [, baseName, argsStr] = genericMatch;
+
+    // If the base type isn't in the registry, fall back to serde_json::Value
+    // This handles cases like InstrumentInfoResponseV5<C> where the generic
+    // type alias was skipped during transpilation
+    if (!typeRegistry.isKnownType(baseName) && !["Vec", "Option", "Box", "Arc", "HashMap", "IndexMap"].includes(baseName)) {
+      cleanType = "serde_json::Value";
+      if (isOptional && !cleanType.startsWith("Option<")) {
+        cleanType = `Option<${cleanType}>`;
+      }
+      return cleanType;
+    }
+
     const args = parseGenericArgs(argsStr);
     
     // Convert each argument recursively
@@ -228,6 +240,16 @@ function convertTypeToRust(
     // Filter out unit types and empty object types from generic arguments
     // e.g., ClientResult<undefined, {}> -> ClientResult<()>
     const filteredArgs = convertedArgs.filter(arg => arg !== "()" && arg.trim() !== "");
+
+    // If a known type gets 3+ generic args, it's likely from TS overload merging
+    // (no generated structs have 3+ generic params) — fall back to serde_json::Value
+    if (filteredArgs.length > 2 && typeRegistry.isKnownType(baseName)) {
+      cleanType = "serde_json::Value";
+      if (isOptional && !cleanType.startsWith("Option<")) {
+        cleanType = `Option<${cleanType}>`;
+      }
+      return cleanType;
+    }
     
     if (filteredArgs.length > 0) {
       cleanType = `${baseName}<${filteredArgs.join(", ")}>`;
@@ -453,6 +475,9 @@ function generateRustMethod(
     if (returnType !== "serde_json::Value" && returnType !== "()") {
       // Need to deserialize the response
       body = `${callExpr}.and_then(|v| serde_json::from_value(v).map_err(|e| crate::client::ClientError::SerializationError(e.to_string())))`;
+    } else if (returnType === "()") {
+      // void return — discard the response value
+      body = `${callExpr}.map(|_| ())`;
     } else {
       body = callExpr;
     }
@@ -522,17 +547,22 @@ export function generateClient(
     for (const param of method.params) {
       if (param.isRest) continue;
       
-      const cleanType = param.type
+      let cleanType = param.type
         .replace(/\s*\|\s*undefined$/, "")
         .replace(/Promise<(.+)>$/, "$1")
         .replace(/import\([^)]+\)\./g, "")
         .trim();
       
-      // Check if it's a known type (skip primitives and inline objects)
+      // Strip array suffix and generic args for registry lookup
+      cleanType = cleanType.replace(/\[\]$/, "").replace(/<.+>$/, "").replace(/ & .+$/, "").trim();
+      
+      // Check if it's a known type (skip primitives, inline objects, literals)
       if (
         cleanType &&
-        !cleanType.match(/^(string|number|boolean|void|any)$/) &&
+        !cleanType.match(/^(string|number|boolean|void|any|unknown)$/) &&
         !cleanType.startsWith("{") &&
+        !cleanType.startsWith('"') &&
+        !cleanType.startsWith("'") &&
         !cleanType.includes(" | ")
       ) {
         const isKnownType = typeRegistry.isKnownType(cleanType);

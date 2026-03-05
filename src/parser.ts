@@ -194,6 +194,19 @@ project.getSourceFiles().forEach(sourceFile => {
                         category: category as any,
                         sourceFile: relativePath
                     }, relativePath);
+
+                    // Track type dependencies from generated code (especially for type aliases
+                    // that reference other types, e.g., pub type X = Y<Z>)
+                    const aliasRustFilePath = tsFileToRustFile(relativePath);
+                    const typeRefPattern = /\b([A-Z][A-Za-z0-9_]*)\b/g;
+                    let match;
+                    while ((match = typeRefPattern.exec(result.code)) !== null) {
+                        const ref = match[1];
+                        if (ref !== typeName && typeRegistry.isKnownType(ref)) {
+                            typeRegistry.trackTypeDependency(aliasRustFilePath, ref);
+                        }
+                    }
+
                     console.success(`  ✓ Type alias: ${typeName}`);
                 } else if (result.skipReason) {
                     // Add skipped type as a comment
@@ -671,6 +684,93 @@ function extractCommonInlineTypesEarly(
     }
 }
 
+// ========================================
+// Parse util folder for utility types (WebSocket utilities, etc.)
+// NOTE: Must run BEFORE inline type collection so inline types from util
+// interfaces (e.g., EmittableEvent_EventType) are included.
+// ========================================
+console.info(`\nParsing util folder for utility types...`);
+
+const utilFiles = project.getSourceFiles().filter(sf => {
+    const filePath = sf.getFilePath();
+    const relativePath = path.relative(path.join(BYBIT_API_DIR, "src"), filePath);
+    const isBaseClient = relativePath.includes("BaseRestClient") || relativePath.includes("BaseWebsocketClient") || relativePath.includes("BaseWSClient");
+    const isWsStore = relativePath.includes("WsStore");
+    const isLogger = relativePath.includes("logger");
+    const isRequestUtils = relativePath.includes("requestUtils");
+    return relativePath.startsWith("util/") && !relativePath.includes("node_modules") && !isBaseClient && !isWsStore && !isLogger && !isRequestUtils;
+});
+
+const utilTypes: RustType[] = [];
+const utilOutputFile = "util/mod.rs";
+const utilModulePath = rustFileToModulePath(utilOutputFile);
+
+const baseWSClientFile = project.getSourceFile(path.join(BYBIT_API_DIR, "src/util/BaseWSClient.ts"));
+if (baseWSClientFile) {
+    utilFiles.push(baseWSClientFile);
+}
+
+for (const sourceFile of utilFiles) {
+    const relativePath = path.relative(path.join(BYBIT_API_DIR, "src"), sourceFile.getFilePath());
+    console.info(`  Processing: ${relativePath}`);
+    
+    for (const interfaceDecl of sourceFile.getInterfaces()) {
+        const interfaceName = interfaceDecl.getName();
+        if (processedTypes.has(interfaceName)) continue;
+        if (interfaceName.includes("EventMap") || interfaceName.includes("PendingTopicSubscriptions")) continue;
+        const skipCheck = BybitHandlers.shouldSkipInterface(interfaceDecl, interfaceName);
+        if (skipCheck.skip) continue;
+        processedTypes.add(interfaceName);
+        
+        const typeParams = interfaceDecl.getTypeParameters();
+        const generics = typeParams.map(tp => tp.getName());
+        
+        const members = interfaceDecl.getProperties().map(prop => {
+            const propName = prop.getName();
+            const isOptional = prop.hasQuestionToken();
+            const propType = prop.getType();
+            const rustType = typeConverter.convert(propType, isOptional, propName, generics, interfaceName, utilOutputFile);
+            return { name: propName, type: rustType, optional: isOptional, docComment: "", isDeprecated: false };
+        });
+        
+        if (members.length > 0) {
+            const jsDocs = interfaceDecl.getJsDocs();
+            const rustCode = convertInterface(interfaceName, members, generics, jsDocs);
+            if (rustCode) {
+                utilTypes.push({ name: interfaceName, content: rustCode, category: "struct", sourceFile: relativePath });
+                typeRegistry.registerType(interfaceName, utilModulePath);
+                console.success(`  ✓ Interface: ${interfaceName}`);
+            }
+        }
+    }
+    
+    for (const typeAlias of sourceFile.getTypeAliases()) {
+        const typeName = typeAlias.getName();
+        if (processedTypes.has(typeName)) continue;
+        processedTypes.add(typeName);
+        
+        const typeNode = typeAlias.getTypeNode();
+        if (typeNode) {
+            const jsDocs = typeAlias.getJsDocs();
+            const result = convertTypeAlias(typeName, typeNode, jsDocs, relativePath);
+            if (result.code) {
+                utilTypes.push({ name: typeName, content: result.code, category: "type_alias", sourceFile: relativePath });
+                typeRegistry.registerType(typeName, utilModulePath);
+                console.success(`  ✓ Type alias: ${typeName}`);
+            } else if (result.skipReason) {
+                utilTypes.push({ name: typeName, content: `// Type alias '${typeName}' skipped: ${result.skipReason}\n`, category: "skipped", sourceFile: relativePath, skipReason: result.skipReason });
+            }
+        }
+    }
+}
+
+console.info(`  Found ${utilTypes.length} types in util folder`);
+
+if (utilTypes.length > 0) {
+    const utilFileStructure = getFileStructure(utilOutputFile);
+    utilTypes.forEach(type => utilFileStructure.mainContent.push(type));
+}
+
 // Group inline types by their source file
 const inlineTypes = inlineTypeRegistry.getAllInlineTypes();
 const inlineTypesByFile = new Map<string, typeof inlineTypes>();
@@ -730,7 +830,7 @@ if (inlineTypes.length > 0) {
 
     // Register inline types with their final locations and add to FileStructures
     for (const [targetFile, types] of inlineTypesByFile.entries()) {
-        const modulePath = targetFile.replace(/\.rs$/, '').replace(/\//g, '::');
+        const modulePath = targetFile.replace(/\.rs$/, '').replace(/\//g, '::').replace(/::mod$/, '');
         const fileStructure = getFileStructure(targetFile);
         
         for (const inlineType of types) {
@@ -913,129 +1013,6 @@ for (const sourceFile of project.getSourceFiles()) {
 }
 
 console.info(`  Transpiled ${totalClientsTranspiled} client classes`);
-
-// Parse util folder for utility types (WebSocket utilities, etc.)
-console.info(`\nParsing util folder for utility types...`);
-
-const utilFiles = project.getSourceFiles().filter(sf => {
-    const filePath = sf.getFilePath();
-    const relativePath = path.relative(path.join(BYBIT_API_DIR, "src"), filePath);
-    // Skip base client files (they are hand-written), WsStore (implementation details), and node_modules
-    const isBaseClient = relativePath.includes("BaseRestClient") || relativePath.includes("BaseWebsocketClient") || relativePath.includes("BaseWSClient");
-    const isWsStore = relativePath.includes("WsStore");
-    const isLogger = relativePath.includes("logger");
-    const isRequestUtils = relativePath.includes("requestUtils");
-    return relativePath.startsWith("util/") && !relativePath.includes("node_modules") && !isBaseClient && !isWsStore && !isLogger && !isRequestUtils;
-});
-
-const utilTypes: RustType[] = [];
-const utilOutputFile = "util/mod.rs";
-const utilModulePath = rustFileToModulePath(utilOutputFile);
-
-// Also process BaseWSClient.ts for interface/type definitions (skip the class)
-const baseWSClientFile = project.getSourceFile(path.join(BYBIT_API_DIR, "src/util/BaseWSClient.ts"));
-if (baseWSClientFile) {
-    utilFiles.push(baseWSClientFile);
-}
-
-for (const sourceFile of utilFiles) {
-    const relativePath = path.relative(path.join(BYBIT_API_DIR, "src"), sourceFile.getFilePath());
-    
-    console.info(`  Processing: ${relativePath}`);
-    
-    // Parse interfaces
-    for (const interfaceDecl of sourceFile.getInterfaces()) {
-        const interfaceName = interfaceDecl.getName();
-        
-        // Skip if already processed or should be skipped
-        if (processedTypes.has(interfaceName)) continue;
-        
-        // Skip event maps and internal implementation details
-        if (interfaceName.includes("EventMap") || interfaceName.includes("PendingTopicSubscriptions")) {
-            console.info(`  ⊘ Skipping ${interfaceName} (event map/internal type)`);
-            continue;
-        }
-        
-        const skipCheck = BybitHandlers.shouldSkipInterface(interfaceDecl, interfaceName);
-        if (skipCheck.skip) continue;
-        
-        processedTypes.add(interfaceName);
-        
-        const typeParams = interfaceDecl.getTypeParameters();
-        const generics = typeParams.map(tp => tp.getName());
-        
-        const members = interfaceDecl.getProperties().map(prop => {
-            const propName = prop.getName();
-            const isOptional = prop.hasQuestionToken();
-            const propType = prop.getType();
-            const rustType = typeConverter.convert(propType, isOptional, propName, generics, interfaceName, utilOutputFile);
-            
-            return {
-                name: propName,
-                type: rustType,
-                optional: isOptional,
-                docComment: "",
-                isDeprecated: false
-            };
-        });
-        
-        if (members.length > 0) {
-            const jsDocs = interfaceDecl.getJsDocs();
-            const rustCode = convertInterface(interfaceName, members, generics, jsDocs);
-            
-            if (rustCode) {
-                utilTypes.push({
-                    name: interfaceName,
-                    content: rustCode,
-                    category: "struct",
-                    sourceFile: relativePath,
-                });
-                typeRegistry.registerType(interfaceName, utilModulePath);
-                console.success(`  ✓ Interface: ${interfaceName}`);
-            }
-        }
-    }
-    
-    // Parse type aliases
-    for (const typeAlias of sourceFile.getTypeAliases()) {
-        const typeName = typeAlias.getName();
-        if (processedTypes.has(typeName)) continue;
-        processedTypes.add(typeName);
-        
-        const typeNode = typeAlias.getTypeNode();
-        if (typeNode) {
-            const jsDocs = typeAlias.getJsDocs();
-            const result = convertTypeAlias(typeName, typeNode, jsDocs, relativePath);
-            
-            if (result.code) {
-                utilTypes.push({
-                    name: typeName,
-                    content: result.code,
-                    category: "type_alias",
-                    sourceFile: relativePath,
-                });
-                typeRegistry.registerType(typeName, utilModulePath);
-                console.success(`  ✓ Type alias: ${typeName}`);
-            } else if (result.skipReason) {
-                utilTypes.push({
-                    name: typeName,
-                    content: `// Type alias '${typeName}' skipped: ${result.skipReason}\n`,
-                    category: "skipped",
-                    sourceFile: relativePath,
-                    skipReason: result.skipReason
-                });
-            }
-        }
-    }
-}
-
-console.info(`  Found ${utilTypes.length} types in util folder`);
-
-// Write util types to util/mod.rs
-if (utilTypes.length > 0) {
-    const utilFileStructure = getFileStructure(utilOutputFile);
-    utilTypes.forEach(type => utilFileStructure.mainContent.push(type));
-}
 
 // Add imports to FileStructures
 for (const [rustFilePath, fileStructure] of fileStructures.entries()) {
