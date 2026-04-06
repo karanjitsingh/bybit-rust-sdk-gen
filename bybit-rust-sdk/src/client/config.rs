@@ -48,19 +48,6 @@ impl ClientConfig {
     pub fn builder() -> ClientConfigBuilder {
         ClientConfigBuilder::default()
     }
-    
-    /// Create a config for testnet
-    pub fn testnet() -> Self {
-        Self {
-            base_url: "https://api-testnet.bybit.com".to_string(),
-            ..Default::default()
-        }
-    }
-    
-    /// Create a config for mainnet
-    pub fn mainnet() -> Self {
-        Self::default()
-    }
 }
 
 /// Builder for ClientConfig
@@ -68,6 +55,7 @@ impl ClientConfig {
 pub struct ClientConfigBuilder {
     api_key: Option<String>,
     api_secret: Option<String>,
+    testnet: bool,
     base_url: Option<String>,
     recv_window: Option<u64>,
     timeout: Option<Duration>,
@@ -82,69 +70,70 @@ impl ClientConfigBuilder {
         self.api_key = Some(api_key.into());
         self
     }
-    
+
     /// Set the API secret
     pub fn api_secret<S: Into<String>>(mut self, api_secret: S) -> Self {
         self.api_secret = Some(api_secret.into());
         self
     }
-    
-    /// Set the base URL
+
+    /// Use testnet (true) or mainnet (false, default)
+    pub fn testnet(mut self, enabled: bool) -> Self {
+        self.testnet = enabled;
+        self
+    }
+
+    /// Override the base URL directly (takes precedence over testnet flag)
     pub fn base_url<S: Into<String>>(mut self, base_url: S) -> Self {
         self.base_url = Some(base_url.into());
         self
     }
-    
-    /// Use testnet
-    pub fn testnet(mut self) -> Self {
-        self.base_url = Some("https://api-testnet.bybit.com".to_string());
-        self
-    }
-    
-    /// Use mainnet (default)
-    pub fn mainnet(mut self) -> Self {
-        self.base_url = Some("https://api.bybit.com".to_string());
-        self
-    }
-    
+
     /// Set the receive window (milliseconds)
     pub fn recv_window(mut self, recv_window: u64) -> Self {
         self.recv_window = Some(recv_window);
         self
     }
-    
+
     /// Set the request timeout
     pub fn timeout(mut self, timeout: Duration) -> Self {
         self.timeout = Some(timeout);
         self
     }
-    
+
     /// Enable time synchronization
     pub fn enable_time_sync(mut self, enable: bool) -> Self {
         self.enable_time_sync = Some(enable);
         self
     }
-    
+
     /// Set sync interval
     pub fn sync_interval(mut self, interval: Duration) -> Self {
         self.sync_interval = Some(interval);
         self
     }
-    
+
     /// Set user agent
     pub fn user_agent<S: Into<String>>(mut self, user_agent: S) -> Self {
         self.user_agent = Some(user_agent.into());
         self
     }
-    
+
     /// Build the config
     pub fn build(self) -> ClientConfig {
         let default = ClientConfig::default();
-        
+        let base_url = self.base_url.unwrap_or_else(|| {
+            if self.testnet {
+                "https://api-testnet.bybit.com".to_string()
+            } else {
+                default.base_url
+            }
+        });
+
         ClientConfig {
             api_key: self.api_key,
             api_secret: self.api_secret,
-            base_url: self.base_url.unwrap_or(default.base_url),
+            base_url,
             recv_window: self.recv_window.unwrap_or(default.recv_window),
             timeout: self.timeout.unwrap_or(default.timeout),
             enable_time_sync: self.enable_time_sync.unwrap_or(default.enable_time_sync),
