@@ -8,13 +8,12 @@
 
 This is currently a work in progress, the generated code does not compile.
 
-1. Initialize the `tiagosiebler/bybit-api` submodule
+1. Initialize submodules (`bybit-api` and `bybit-rust-sdk`):
    ```
-   git submodule init
-   git submodule update
+   git submodule update --init --recursive
    ```
 
-1. Build the typescript library first with `npm run build`. Running `npm run gen` will genearte the typescript Rust SDK into `./bybit-rust-sdk`. Note that the transpiler only converts interfaces and other types and not actual execution code, some bits of the sdk are still written by hand:
+1. Build the typescript transpiler with `npm run build`. Then run `npm run gen` to generate the Rust SDK into `./bybit-rust-sdk`. Note that the transpiler only converts interfaces and other types and not actual execution code, some bits of the sdk are still written by hand:
    - `bybit-rust-sdk/`
       - `Cargo.toml`
       - `src/client/BaseRestClient.rs`
