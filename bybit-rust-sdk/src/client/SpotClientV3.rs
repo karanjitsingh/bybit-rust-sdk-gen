@@ -1,5 +1,5 @@
 // Auto-generated from TypeScript definitions
-// Source: /local/home/kjsing/code/bybit-rust-sdk-gen/bybit-api/src/spot-client-v3.ts
+// Source: /Users/karan/code/bybit-rust-sdk-gen/bybit-api/src/spot-client-v3.ts
 
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
