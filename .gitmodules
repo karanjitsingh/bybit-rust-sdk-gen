@@ -1,3 +1,6 @@
 [submodule "bybit-api"]
 	path = bybit-api
 	url = https://github.com/tiagosiebler/bybit-api
+[submodule "bybit-rust-sdk"]
+	path = bybit-rust-sdk
+	url = https://github.com/karanjitsingh/bybit-rust-sdk
