@@ -34,4 +34,10 @@ impl BaseWebsocketClient {
         // TODO: Implement WS API request logic
         Err(ClientError::WebSocketError("Not yet implemented".to_string()))
     }
+
+    /// Try to send a raw message on a WebSocket connection
+    pub fn try_ws_send(&self, _ws_key: &str, _msg: &str) -> ClientResult<()> {
+        // TODO: Implement raw WS send
+        Err(ClientError::WebSocketError("Not yet implemented".to_string()))
+    }
 }

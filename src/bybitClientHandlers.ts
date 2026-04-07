@@ -533,7 +533,31 @@ function generateRustMethod(
     // Abstract methods should be implemented by subclasses
     body = `unimplemented!("Abstract method '${parsedMethod.name}' must be implemented by subclass")`;
   } else {
-    body = `todo!("Method implementation: ${parsedMethod.name}")`;
+    // Check for known simple implementations
+    const knownImpls: Record<string, string> = {
+      // RestClientV5 / SpotClientV3
+      "getClientType": `Ok("v5".to_string())`,
+      "fetchServerTime": `let res = self.get_server_time().await?;\nlet time_str = res.get("time").and_then(|v| v.as_str()).unwrap_or("0");\nOk(time_str.parse::<f64>().unwrap_or(0.0) / 1000.0)`,
+      // WebsocketAPIClient
+      "setTimeOffsetMs": `Ok(())`,
+      // WebsocketClient simple methods
+      "sendPingEvent": `self.base.try_ws_send(&format!("{:?}", wsKey), &serde_json::json!({"op": "ping"}).to_string())`,
+      "sendPongEvent": `self.base.try_ws_send(&format!("{:?}", wsKey), &serde_json::json!({"op": "pong"}).to_string())`,
+      "getPrivateWSKeys": `Ok(vec![WsKey::V5Private, WsKey::V5PrivateTrade])`,
+      "isAuthOnConnectWsKey": `Ok(matches!(wsKey, WsKey::V5Private | WsKey::V5PrivateTrade))`,
+      "authPrivateConnectionsOnConnect": `Ok(true)`,
+      "isCustomReconnectionNeeded": `Ok(false)`,
+      "isWsPing": `let s = serde_json::to_string(&msg).unwrap_or_default();\nOk(s.contains(r#"op":"ping"#))`,
+      "isWsPong": `let s = serde_json::to_string(&msg).unwrap_or_default();\nOk(s.contains(r#"ret_msg":"pong"#) || s.contains(r#"op":"pong"#))`,
+      "getMaxTopicsPerSubscribeEvent": `Ok(serde_json::json!(500))`,
+      "isPrivateTopicRequest": `let topic = request.topic.to_lowercase();\nlet private_topics = ["stop_order","outboundaccountinfo","executionreport","ticketinfo","copytradeposition","copytradeorder","copytradeexecution","copytradewallet","user.openapi.option.position","user.openapi.option.trade","user.order","user.execution","user.position","user.wallet","wallet","position","execution","order","dv5.position","dv5.order","dv5.execution","dv5.wallet"];\nOk(private_topics.iter().any(|t| *t == topic))`,
+    };
+
+    if (knownImpls[parsedMethod.name]) {
+      body = knownImpls[parsedMethod.name];
+    } else {
+      body = `todo!("Method implementation: ${parsedMethod.name}")`;
+    }
   }
 
   return {

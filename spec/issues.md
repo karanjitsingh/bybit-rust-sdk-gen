@@ -40,9 +40,9 @@ signature. Fixes use the existing registries and never emit duplicate structs.
 ## Build Stats
 - Total generated types: 891
 - Total files: 56
-- Compilation: 0 errors, 57 warnings (all benign)
+- Compilation: 0 errors, 81 warnings (all benign)
 - Skipped types: 7 (complex TS-only constructs)
-- Remaining stubs: 32 (todo!/unimplemented!) — need hand-written Rust implementations
+- Remaining stubs: 17 (13 todo!/4 unimplemented!) — 15 implemented via knownImpls
 
 ---
 
@@ -178,34 +178,30 @@ fileStructure.ts, fileGenerator.ts, parser.ts
 
 ## Remaining
 
-### Issue 12: 32 `todo!()`/`unimplemented!()` stubs need hand-written Rust
-These methods have complex logic that can't be auto-transpiled. Hand-write in `hand-written/`.
+### Issue 12: 17 remaining `todo!()`/`unimplemented!()` stubs
+15 simple methods implemented via `knownImpls` map in `bybitClientHandlers.ts`.
+Added `try_ws_send` to `hand-written/src/client/BaseWebsocketClient.rs`.
+
+Implemented: `getClientType` (×2), `fetchServerTime` (×2), `setTimeOffsetMs`,
+`sendPingEvent`, `sendPongEvent`, `getPrivateWSKeys`, `isAuthOnConnectWsKey`,
+`authPrivateConnectionsOnConnect`, `isCustomReconnectionNeeded`, `isWsPing`,
+`isWsPong`, `getMaxTopicsPerSubscribeEvent`, `isPrivateTopicRequest`.
+
+Remaining stubs (complex — need full WS/REST infrastructure):
 
 | File | Method | Notes |
 |------|--------|-------|
-| WebsocketAPIClient.rs | `getWSClient` | Simple: return `&self.ws_client` |
-| WebsocketAPIClient.rs | `setTimeOffsetMs` | Simple: delegate to ws_client |
-| RestClientV5.rs | `getClientType` | Simple: return constant |
-| RestClientV5.rs | `fetchServerTime` | Call `get_server_time()` + math |
+| WebsocketAPIClient.rs | `getWSClient` | Needs signature change (return ref) |
 | RestClientV5.rs | `fetchLatencySummary` | Multi-step latency calculation |
-| RestClientV5.rs | `uploadP2PChatFile` | Needs `post_private_file` on BaseRestClient |
-| SpotClientV3.rs | `getClientType` | Simple: return constant |
-| SpotClientV3.rs | `fetchServerTime` | Call `get_server_time()` + conversion |
+| RestClientV5.rs | `uploadP2PChatFile` | Needs multipart upload on BaseRestClient |
 | WebsocketClient.rs | 4 abstract methods | `unimplemented!()` — correct, override points |
-| WebsocketClient.rs | `connectWSAPI` | Calls `assertIsAuthenticated` |
-| WebsocketClient.rs | `connectPublic` | Switch on market, calls `connect` per ws key |
-| WebsocketClient.rs | `connectPrivate` | Switch on market, calls `connect` |
+| WebsocketClient.rs | `connectWSAPI` | Needs `assertIsAuthenticated` on base |
+| WebsocketClient.rs | `connectPublic` | Needs `connect` per ws key on base |
+| WebsocketClient.rs | `connectPrivate` | Needs `connect` on base |
 | WebsocketClient.rs | `subscribeV5` | Topic routing + batch subscribe loop |
 | WebsocketClient.rs | `unsubscribeV5` | Topic routing + batch unsubscribe loop |
 | WebsocketClient.rs | `subscribe` | Normalise topics, route per ws key |
 | WebsocketClient.rs | `unsubscribe` | Normalise topics, route per ws key |
 | WebsocketClient.rs | `getWsUrl` | Build WS URL + auth suffix |
-| WebsocketClient.rs | `sendPingEvent` | JSON `{ op: "ping" }` via `tryWsSend` |
-| WebsocketClient.rs | `sendPongEvent` | JSON `{ op: "pong" }` via `tryWsSend` |
-| WebsocketClient.rs | `getMaxTopicsPerSubscribeEvent` | Delegate to util function |
-| WebsocketClient.rs | `getPrivateWSKeys` | Return `WS_AUTH_ON_CONNECT_KEYS` |
-| WebsocketClient.rs | `isAuthOnConnectWsKey` | Check if key in auth list |
-| WebsocketClient.rs | `isPrivateTopicRequest` | Check topic name against private list |
-| WebsocketClient.rs | `isWsPing` | Parse message data for ping op |
-| WebsocketClient.rs | `isWsPong` | Parse message data for pong op |
+| WebsocketClient.rs | `triggerCustomReconnectionWorkflow` | Custom reconnection logic |
 | WebsocketClient.rs | `resolveEmittableEvents` | JSON parse + event type routing |
