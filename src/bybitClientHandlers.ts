@@ -77,7 +77,7 @@ export function parseMethodImplementation(
     };
   }
 
-  // Check for REST patterns: this.getPrivate, this.postPrivate, this.get, this.post, etc.
+  // Check for REST patterns: this.getPrivate, this.postPrivate, etc.
   // Match: return this.XXXX('/endpoint', params)
   const restMatch = bodyText.match(
     /return\s+this\.(get|post|put|delete)(?:Private|Public)?\s*\(\s*['"]([^'"]+)['"]\s*(?:,\s*([\s\S]+?))?\s*\)/
@@ -85,7 +85,7 @@ export function parseMethodImplementation(
 
   if (restMatch) {
     const [, httpMethod, endpoint, paramsExpr] = restMatch;
-    const methodName = bodyText.match(/this\.(get|post|put|delete)(Private|Public)?/)?.[0];
+    const methodName = bodyText.match(/this\.(get|post|put|delete)(?:Private|Public)?(?=\s*\()/)?.[0];
     return {
       type: "rest",
       httpMethod: httpMethod.toUpperCase() as "GET" | "POST" | "PUT" | "DELETE",
@@ -95,8 +95,9 @@ export function parseMethodImplementation(
   }
 
   // Check for WebSocket patterns: this.wsClient.sendWSAPIRequest or sendWSAPIRequest
+  // Supports: simple var params, object literal params, or no params
   const wsMatch = bodyText.match(
-    /(?:this\.wsClient\.)?sendWSAPIRequest\s*\(\s*(?:WS_KEY_MAP\.)?(\w+)\s*,\s*['"]([^'"]+)['"]\s*,?\s*(\w+)?\s*\)/
+    /(?:this\.wsClient\.)?sendWSAPIRequest\s*\(\s*(?:WS_KEY_MAP\.)?(\w+)\s*,\s*['"]([^'"]+)['"]\s*(?:,\s*(?:(\w+)|\{[\s\S]*?\}))?\s*[,\s]*\)/
   );
 
   if (wsMatch) {
@@ -379,7 +380,7 @@ function toPascalCase(str: string): string {
  */
 function operationToEnumVariant(operation: string): string {
   return operation
-    .split(".")
+    .split(/[.\-]/)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join("");
 }
@@ -482,12 +483,24 @@ function generateRustMethod(
       body = callExpr;
     }
   } else if (impl.type === "websocket") {
-    const wsKeyVariant = wsKeyToEnumVariant(impl.wsKey || "");
-    const operationVariant = operationToEnumVariant(impl.wsOperation || "");
+    const wsOperation = impl.wsOperation || "";
     const hasParams = parsedMethod.params.length > 0;
-    const paramsArg = hasParams ? "params" : "()";
 
-    body = `self.ws_client.send_ws_api_request(WsKey::${wsKeyVariant}, WSAPIOperation::${operationVariant}, ${paramsArg}).await`;
+    let paramsArg: string;
+    if (!hasParams) {
+      paramsArg = "serde_json::Value::Null";
+    } else if (parsedMethod.params.length === 1) {
+      const paramName = makeValidRustIdent(parsedMethod.params[0].name);
+      paramsArg = `serde_json::to_value(${paramName}).unwrap_or_default()`;
+    } else {
+      // Multiple params — build a JSON object (e.g. batch methods with category + orders)
+      paramsArg = `serde_json::json!({${parsedMethod.params.map(p => {
+        const name = makeValidRustIdent(p.name);
+        return `"${p.name}": ${name}`;
+      }).join(", ")}})`;
+    }
+
+    body = `self.ws_client.send_ws_api_request(Some(WsKey::${wsKeyToEnumVariant(impl.wsKey || "")}), serde_json::Value::String("${wsOperation}".to_string()), ${paramsArg}).await`;
   } else if (impl.type === "abstract") {
     // Abstract methods should be implemented by subclasses
     body = `unimplemented!("Abstract method '${parsedMethod.name}' must be implemented by subclass")`;
