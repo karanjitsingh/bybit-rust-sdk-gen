@@ -217,6 +217,24 @@ function convertTypeToRust(
     return cleanType;
   }
 
+  // Handle keyof expressions — TS-only type construct, map to String
+  if (cleanType.startsWith("keyof ")) {
+    cleanType = "String";
+    if (isOptional) {
+      cleanType = `Option<${cleanType}>`;
+    }
+    return cleanType;
+  }
+
+  // Handle indexed access types like Parameters<...>[N]
+  if (/\]\s*$/.test(cleanType) && cleanType.includes('<')) {
+    cleanType = "serde_json::Value";
+    if (isOptional) {
+      cleanType = `Option<${cleanType}>`;
+    }
+    return cleanType;
+  }
+
   // Handle generic types with parameters: Foo<Bar, Baz>
   const genericMatch = cleanType.match(/^([A-Za-z_]\w*)<(.+)>$/);
   if (genericMatch) {
@@ -244,8 +262,18 @@ function convertTypeToRust(
 
     // If a known type gets 3+ generic args, it's likely from TS overload merging
     // (no generated structs have 3+ generic params) — fall back to serde_json::Value
+    // Also fall back for 2+ args on response wrapper types where a generic param
+    // may have been removed during inline object conversion
     if (filteredArgs.length > 2 && typeRegistry.isKnownType(baseName)) {
       cleanType = "serde_json::Value";
+      if (isOptional && !cleanType.startsWith("Option<")) {
+        cleanType = `Option<${cleanType}>`;
+      }
+      return cleanType;
+    }
+    if (filteredArgs.length === 2 && typeRegistry.isKnownType(baseName) && /Response|API/.test(baseName)) {
+      // Response wrappers may have had generic params removed — use just the last arg
+      cleanType = `${baseName}<${filteredArgs[filteredArgs.length - 1]}>`;
       if (isOptional && !cleanType.startsWith("Option<")) {
         cleanType = `Option<${cleanType}>`;
       }
@@ -500,7 +528,7 @@ function generateRustMethod(
       }).join(", ")}})`;
     }
 
-    body = `self.ws_client.send_ws_api_request(Some(WsKey::${wsKeyToEnumVariant(impl.wsKey || "")}), serde_json::Value::String("${wsOperation}".to_string()), ${paramsArg}).await`;
+    body = `self.ws_client.send_ws_api_request(Some(WsKey::${wsKeyToEnumVariant(impl.wsKey || "")}), serde_json::Value::String("${wsOperation}".to_string()), ${paramsArg}, None).await`;
   } else if (impl.type === "abstract") {
     // Abstract methods should be implemented by subclasses
     body = `unimplemented!("Abstract method '${parsedMethod.name}' must be implemented by subclass")`;

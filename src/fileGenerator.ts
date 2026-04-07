@@ -188,13 +188,16 @@ export class FileGenerator {
                             variantName = variant;
                         } else if (variant === "string") {
                             rustType = "String";
-                            variantName = "String";
+                            variantName = "StringValue";
                         } else if (variant === "number") {
                             rustType = "f64";
                             variantName = "Number";
                         } else if (variant === "boolean") {
                             rustType = "bool";
                             variantName = "Boolean";
+                        } else if (/^[a-z]/.test(variant) || variant.includes(" ")) {
+                            rustType = "String";
+                            variantName = makeValidRustIdent(variant);
                         } else {
                             rustType = variant;
                             variantName = variant;
@@ -273,18 +276,6 @@ pub enum ClientError {
     
     #[error("API error: {0}")]
     ApiError(String),
-}
-
-// Client configuration types (extracted from TypeScript client files)
-use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct DeferredPromiseRef(pub String);
-
-/// Configurable options specific to only the REST-like WebsocketAPIClient
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct WSAPIClientConfigurableOptions {
-    pub attachEventListeners: bool,
 }
 
 // Core infrastructure

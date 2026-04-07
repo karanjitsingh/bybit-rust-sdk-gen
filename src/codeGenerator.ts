@@ -495,11 +495,21 @@ export function convertInterface(interfaceName: string, members: StructMember[],
     // }
 
     // Add generic parameters if present
+    // First, filter out generics that aren't actually used in any field type
+    let usedGenerics = generics;
     if (generics.length > 0) {
+        const allFieldTypes = members.map(m => m.type).join(" ");
+        usedGenerics = generics.filter(g => {
+            const paramName = g.includes('=') ? g.split('=')[0].trim() : g.trim();
+            return new RegExp(`\\b${paramName}\\b`).test(allFieldTypes);
+        });
+    }
+
+    if (usedGenerics.length > 0) {
         // If we're deriving Default, add Default trait bounds to generic parameters
-        let processedGenerics = generics;
+        let processedGenerics = usedGenerics;
         if (shouldDeriveDefault) {
-            processedGenerics = generics.map(g => {
+            processedGenerics = usedGenerics.map(g => {
                 // Check if generic already has a default value (e.g., "T = String")
                 if (g.includes('=')) {
                     const parts = g.split('=');
@@ -563,7 +573,7 @@ export function convertInterface(interfaceName: string, members: StructMember[],
         
         // Remove unnecessary parentheses around single types (but keep tuple syntax)
         let cleanedType = memberType;
-        if (memberType.startsWith('(') && memberType.endsWith(')') && !memberType.includes(',')) {
+        if (memberType.startsWith('(') && memberType.endsWith(')') && !memberType.includes(',') && memberType !== '()') {
             cleanedType = memberType.slice(1, -1);
         }
         

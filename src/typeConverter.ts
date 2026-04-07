@@ -29,7 +29,7 @@ export class TypeConverter {
         if (type.isString() || type.isStringLiteral()) return "String";
         if (type.isNumber() || type.isNumberLiteral()) return "f64";
         if (type.isBoolean() || type.isBooleanLiteral()) return "bool";
-        if (typeText === "null" || typeText === "undefined") return "()";
+        if (typeText === "null" || typeText === "undefined") return "Option<serde_json::Value>";
         if (typeText === "any") {
             console.warn(`  ⚠️  Field '${fieldName}' has 'any' type - using serde_json::Value`);
             return "serde_json::Value";
@@ -377,6 +377,21 @@ export class TypeConverter {
             }
 
             // Anonymous inline object type (e.g., { code: number; msg: string })
+            // If the inline object references generic params from the parent, use serde_json::Value
+            // because inline structs can't declare their own generic params
+            if (genericsContext.length > 0) {
+                const props = type.getProperties();
+                const refsGeneric = props.some(p => {
+                    try {
+                        const pt = p.getTypeAtLocation(p.getValueDeclarationOrThrow());
+                        return pt.isTypeParameter() && genericsContext.includes(pt.getText());
+                    } catch { return false; }
+                });
+                if (refsGeneric) {
+                    console.warn(`  ⚠️  Inline object '${fieldName}' references generic params - using serde_json::Value`);
+                    return "serde_json::Value";
+                }
+            }
             // Generate a struct for it on the fly
             console.debug(`  → Anonymous inline object in field '${fieldName}' - generating struct`);
             
@@ -459,6 +474,18 @@ export class TypeConverter {
         // Handle never type
         if (cleaned === 'never') {
             return '()';
+        }
+
+        // Handle indexed access types like Parameters<...>[N] — fall back to serde_json::Value
+        if (/^(Parameters|ReturnType)<.+>\[\d+\]$/.test(cleaned) || /\[.+\]$/.test(cleaned) && cleaned.includes('<')) {
+            console.warn(`  ⚠️  Indexed access type '${cleaned}' - using serde_json::Value`);
+            return "serde_json::Value";
+        }
+
+        // Handle keyof expressions — TS-only type construct
+        if (cleaned.startsWith('keyof ') || cleaned.includes('keyof ')) {
+            console.warn(`  ⚠️  keyof type '${cleaned}' - using String`);
+            return "String";
         }
 
         // If it's not a known type we're generating, throw error
@@ -559,8 +586,6 @@ export class TypeConverter {
             }
 
             // Convert the property type
-            // IMPORTANT: Pass typeName as sourceInterface so nested inline types get proper names
-            // e.g., MovePositionParamsV5_List_Category instead of MovePositionParamsV5_Category
             const rustType = this.convert(propType, isOptional, propName, genericsContext, typeName, rustFilePath);
 
             // Extract and track type dependencies from this field

@@ -1073,6 +1073,20 @@ for (const dir of sortedDirs) {
 
     if (modules.length > 0) {
         fileGenerator.generateModFile(dir, modules);
+        
+        // For client/mod.rs, append extracted types from the file structure
+        if (dir === "client" && fileStructures.has("client/mod.rs")) {
+            const clientModTypes = fileStructures.get("client/mod.rs")!;
+            if (clientModTypes.mainContent.length > 0) {
+                const modPath = path.join(GEN_DIR, "client", "mod.rs");
+                let extraContent = "\n// Extracted types from client files\nuse serde::{Deserialize, Serialize};\nuse derive_builder::Builder;\n\n";
+                for (const rustType of clientModTypes.mainContent) {
+                    extraContent += rustType.content + "\n";
+                }
+                fs.appendFileSync(modPath, extraContent);
+            }
+        }
+        
         console.success(`✓ ${dir}/mod.rs (${modules.length} modules)`);
     }
 }

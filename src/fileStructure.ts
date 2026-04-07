@@ -218,13 +218,16 @@ export class FileStructure {
                         variantName = variant;
                     } else if (variant === "string") {
                         rustType = "String";
-                        variantName = "String";
+                        variantName = "StringValue";
                     } else if (variant === "number") {
                         rustType = "f64";
                         variantName = "Number";
                     } else if (variant === "boolean") {
                         rustType = "bool";
                         variantName = "Boolean";
+                    } else if (/^[a-z]/.test(variant) || variant.includes(" ")) {
+                        rustType = "String";
+                        variantName = makeValidRustIdent(variant);
                     } else {
                         rustType = variant;
                         variantName = variant;
@@ -325,13 +328,17 @@ export class FileStructure {
                         variantName = variant;
                     } else if (variant === "string") {
                         rustType = "String";
-                        variantName = "String";
+                        variantName = "StringValue";
                     } else if (variant === "number") {
                         rustType = "f64";
                         variantName = "Number";
                     } else if (variant === "boolean") {
                         rustType = "bool";
                         variantName = "Boolean";
+                    } else if (/^[a-z]/.test(variant) || variant.includes(" ")) {
+                        // String literal value (starts with lowercase or has spaces)
+                        rustType = "String";
+                        variantName = makeValidRustIdent(variant);
                     } else {
                         rustType = variant;
                         variantName = variant;
@@ -344,6 +351,21 @@ export class FileStructure {
                 }
 
                 content += `    }\n\n`;
+
+                // Add Default impl for generic heterogeneous enums
+                if (isGeneric) {
+                    // Find the first non-generic String variant for default
+                    const stringVariant = inlineType.variants.find(v =>
+                        !inlineType.genericParams!.includes(v) && v !== "string" && v !== "number" && v !== "boolean"
+                    );
+                    if (stringVariant) {
+                        const defaultVariant = /^[a-z]/.test(stringVariant) || stringVariant.includes(" ")
+                            ? makeValidRustIdent(stringVariant) : stringVariant;
+                        content += `    impl<${inlineType.genericParams.join(", ")}> Default for ${inlineType.typeName}<${inlineType.genericParams.join(", ")}> {\n`;
+                        content += `        fn default() -> Self { Self::${defaultVariant}(String::new()) }\n`;
+                        content += `    }\n\n`;
+                    }
+                }
             } else {
                 // Homogeneous union
                 const variants = inlineType.variants.map((v: string) => ({

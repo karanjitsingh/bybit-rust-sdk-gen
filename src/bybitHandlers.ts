@@ -75,7 +75,7 @@ export function extractClientTypes(
     relativePath: string
 ): RustType[] {
     const extractedTypes: RustType[] = [];
-    const outputFilePath = "client/mod.rs";
+    const outputFilePath = "crate::client";
     
     console.info(`  📋 Extracting types from client file: ${relativePath}`);
     
