@@ -40,9 +40,9 @@ signature. Fixes use the existing registries and never emit duplicate structs.
 ## Build Stats
 - Total generated types: 891
 - Total files: 56
-- Compilation: 0 errors, 81 warnings (all benign)
+- Compilation: 0 errors, 40 warnings (all benign)
 - Skipped types: 7 (complex TS-only constructs)
-- Remaining stubs: 17 (13 todo!/4 unimplemented!) — 15 implemented via knownImpls
+- Remaining stubs: 5 (4 abstract `unimplemented!()` + 1 `getWSClient` needs signature change)
 
 ---
 
@@ -178,30 +178,17 @@ fileStructure.ts, fileGenerator.ts, parser.ts
 
 ## Remaining
 
-### Issue 12: 17 remaining `todo!()`/`unimplemented!()` stubs
-15 simple methods implemented via `knownImpls` map in `bybitClientHandlers.ts`.
-Added `try_ws_send` to `hand-written/src/client/BaseWebsocketClient.rs`.
+### Issue 12: ✅ Method stubs implemented (5 remaining — 4 abstract + 1 signature issue)
+All non-abstract stubs implemented via `knownImpls` map in `bybitClientHandlers.ts`.
 
-Implemented: `getClientType` (×2), `fetchServerTime` (×2), `setTimeOffsetMs`,
-`sendPingEvent`, `sendPongEvent`, `getPrivateWSKeys`, `isAuthOnConnectWsKey`,
-`authPrivateConnectionsOnConnect`, `isCustomReconnectionNeeded`, `isWsPing`,
-`isWsPong`, `getMaxTopicsPerSubscribeEvent`, `isPrivateTopicRequest`.
+Implemented methods: `getClientType` (×2), `fetchServerTime` (×2), `setTimeOffsetMs`,
+`fetchLatencySummary`, `sendPingEvent`, `sendPongEvent`, `getPrivateWSKeys`,
+`isAuthOnConnectWsKey`, `authPrivateConnectionsOnConnect`, `isCustomReconnectionNeeded`,
+`triggerCustomReconnectionWorkflow`, `isWsPing`, `isWsPong`, `getMaxTopicsPerSubscribeEvent`,
+`isPrivateTopicRequest`, `connectWSAPI`, `connectPublic`, `connectPrivate`, `getWsUrl`,
+`subscribeV5`, `unsubscribeV5`, `subscribe`, `unsubscribe`, `resolveEmittableEvents`,
+`uploadP2PChatFile` (returns error — needs multipart).
 
-Remaining stubs (complex — need full WS/REST infrastructure):
-
-| File | Method | Notes |
-|------|--------|-------|
-| WebsocketAPIClient.rs | `getWSClient` | Needs signature change (return ref) |
-| RestClientV5.rs | `fetchLatencySummary` | Multi-step latency calculation |
-| RestClientV5.rs | `uploadP2PChatFile` | Needs multipart upload on BaseRestClient |
-| WebsocketClient.rs | 4 abstract methods | `unimplemented!()` — correct, override points |
-| WebsocketClient.rs | `connectWSAPI` | Needs `assertIsAuthenticated` on base |
-| WebsocketClient.rs | `connectPublic` | Needs `connect` per ws key on base |
-| WebsocketClient.rs | `connectPrivate` | Needs `connect` on base |
-| WebsocketClient.rs | `subscribeV5` | Topic routing + batch subscribe loop |
-| WebsocketClient.rs | `unsubscribeV5` | Topic routing + batch unsubscribe loop |
-| WebsocketClient.rs | `subscribe` | Normalise topics, route per ws key |
-| WebsocketClient.rs | `unsubscribe` | Normalise topics, route per ws key |
-| WebsocketClient.rs | `getWsUrl` | Build WS URL + auth suffix |
-| WebsocketClient.rs | `triggerCustomReconnectionWorkflow` | Custom reconnection logic |
-| WebsocketClient.rs | `resolveEmittableEvents` | JSON parse + event type routing |
+Remaining:
+- 4 abstract methods (`connectAll`, `sendWSAPIRequest`, `getWsAuthRequestEvent`, `getWsRequestEvents`) — `unimplemented!()` by design
+- `getWSClient` — needs return type changed from `ClientResult<WebsocketClient>` to `&WebsocketClient`

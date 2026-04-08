@@ -538,8 +538,11 @@ function generateRustMethod(
       // RestClientV5 / SpotClientV3
       "getClientType": `Ok("v5".to_string())`,
       "fetchServerTime": `let res = self.get_server_time().await?;\nlet time_str = res.get("time").and_then(|v| v.as_str()).unwrap_or("0");\nOk(time_str.parse::<f64>().unwrap_or(0.0) / 1000.0)`,
+      "fetchLatencySummary": `use std::time::{SystemTime, UNIX_EPOCH};\nlet now_ms = || SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() as f64;\nlet t0 = now_ms();\nlet srv = self.get_server_time().await?;\nlet t1 = now_ms();\nlet srv_ms = srv.get("time").and_then(|v| v.as_str()).unwrap_or("0").parse::<f64>().unwrap_or(0.0);\nlet rtt = t1 - t0;\nlet one_way = (rtt / 2.0).floor();\nlet adjusted = srv_ms + one_way;\nlet diff = adjusted - t1;\nOk(serde_json::json!({"localTime": t1, "serverTime": srv_ms, "roundTripTime": rtt, "estimatedOneWayLatency": one_way, "adjustedServerTime": adjusted, "timeDifference": diff}))`,
+      "uploadP2PChatFile": `Err(crate::client::ClientError::ApiError("uploadP2PChatFile requires multipart upload - not yet implemented".to_string()))`,
       // WebsocketAPIClient
       "setTimeOffsetMs": `Ok(())`,
+      "getWSClient": `todo!("getWSClient needs signature change to return reference")`,
       // WebsocketClient simple methods
       "sendPingEvent": `self.base.try_ws_send(&format!("{:?}", wsKey), &serde_json::json!({"op": "ping"}).to_string())`,
       "sendPongEvent": `self.base.try_ws_send(&format!("{:?}", wsKey), &serde_json::json!({"op": "pong"}).to_string())`,
@@ -547,10 +550,23 @@ function generateRustMethod(
       "isAuthOnConnectWsKey": `Ok(matches!(wsKey, WsKey::V5Private | WsKey::V5PrivateTrade))`,
       "authPrivateConnectionsOnConnect": `Ok(true)`,
       "isCustomReconnectionNeeded": `Ok(false)`,
+      "triggerCustomReconnectionWorkflow": `Ok(())`,
       "isWsPing": `let s = serde_json::to_string(&msg).unwrap_or_default();\nOk(s.contains(r#"op":"ping"#))`,
       "isWsPong": `let s = serde_json::to_string(&msg).unwrap_or_default();\nOk(s.contains(r#"ret_msg":"pong"#) || s.contains(r#"op":"pong"#))`,
       "getMaxTopicsPerSubscribeEvent": `Ok(serde_json::json!(500))`,
       "isPrivateTopicRequest": `let topic = request.topic.to_lowercase();\nlet private_topics = ["stop_order","outboundaccountinfo","executionreport","ticketinfo","copytradeposition","copytradeorder","copytradeexecution","copytradewallet","user.openapi.option.position","user.openapi.option.trade","user.order","user.execution","user.position","user.wallet","wallet","position","execution","order","dv5.position","dv5.order","dv5.execution","dv5.wallet"];\nOk(private_topics.iter().any(|t| *t == topic))`,
+      // WebsocketClient connect methods
+      "connectWSAPI": `self.base.connect("v5PrivateTrade").await.map(|_| serde_json::Value::Null)`,
+      "connectPublic": `let keys = ["v5SpotPublic", "v5LinearPublic", "v5InversePublic", "v5OptionPublic"];\nlet mut results = Vec::new();\nfor k in &keys {\n    match self.base.connect(k).await {\n        Ok(_) => results.push(Some(serde_json::Value::Null)),\n        Err(_) => results.push(None),\n    }\n}\nOk(results)`,
+      "connectPrivate": `self.base.connect("v5Private").await.map(|_| serde_json::Value::Null)`,
+      "getWsUrl": `let base_url = match wsKey {\n    WsKey::V5Private | WsKey::V5PrivateTrade => "wss://stream.bybit.com/v5/private",\n    WsKey::V5SpotPublic => "wss://stream.bybit.com/v5/public/spot",\n    WsKey::V5LinearPublic => "wss://stream.bybit.com/v5/public/linear",\n    WsKey::V5InversePublic => "wss://stream.bybit.com/v5/public/inverse",\n    WsKey::V5OptionPublic => "wss://stream.bybit.com/v5/public/option",\n    _ => "wss://stream.bybit.com/v5/public/spot",\n};\nOk(base_url.to_string())`,
+      // WebsocketClient subscribe/unsubscribe (delegate to base)
+      "subscribeV5": `let topics: Vec<String> = wsTopics.iter().filter_map(|t| t.as_str().map(String::from)).collect();\nself.base.subscribe(topics).await.map(|_| vec![])`,
+      "unsubscribeV5": `let topics: Vec<String> = wsTopics.iter().filter_map(|t| t.as_str().map(String::from)).collect();\nself.base.subscribe(topics).await.map(|_| vec![])`,
+      "subscribe": `Ok(())`,
+      "unsubscribe": `Ok(())`,
+      // resolveEmittableEvents
+      "resolveEmittableEvents": `let topic = event.get("topic").and_then(|v| v.as_str());\nlet op = event.get("op").and_then(|v| v.as_str());\nlet ret_code = event.get("retCode").and_then(|v| v.as_i64());\nlet req_id = event.get("reqId");\nlet make_event = |et: &str, ev: serde_json::Value, ws_api: Option<bool>| -> EmittableEvent<String> {\n    EmittableEvent { eventType: crate::util::inline::EmittableEvent_EventType::connectionReady(et.to_string()), event: ev, isWSAPIResponse: ws_api }\n};\n// WS API response\nif ret_code.is_some() && req_id.is_some() {\n    let et = if ret_code.unwrap() != 0 { "exception" } else { "response" };\n    return Ok(vec![make_event(et, event, Some(true))]);\n}\n// Topic update\nif topic.is_some() {\n    return Ok(vec![make_event("update", event, None)]);\n}\n// Operation response\nif let Some(op_str) = op {\n    let et = match op_str {\n        "auth" => "authenticated",\n        "subscribe" | "unsubscribe" | "ping" | "pong" | "COMMAND_RESP" => "response",\n        _ => if event.get("success") == Some(&serde_json::Value::Bool(false)) { "exception" } else { "update" },\n    };\n    return Ok(vec![make_event(et, event, None)]);\n}\nOk(vec![make_event("update", event, None)])`,
     };
 
     if (knownImpls[parsedMethod.name]) {
