@@ -263,19 +263,57 @@ export class FileGenerator {
             modContent += `// Type aliases and error types\n`;
             modContent += `pub type ClientResult<T> = Result<T, ClientError>;
 
+/// Structured Bybit API error with retCode and retMsg
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct BybitApiError {
+    #[serde(rename = "retCode")]
+    pub ret_code: i64,
+    #[serde(rename = "retMsg")]
+    pub ret_msg: String,
+    #[serde(skip)]
+    pub raw_response: Option<serde_json::Value>,
+}
+
+impl std::fmt::Display for BybitApiError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Bybit API error {}: {}", self.ret_code, self.ret_msg)
+    }
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum ClientError {
     #[error("HTTP error: {0}")]
     HttpError(String),
-    
+
     #[error("WebSocket error: {0}")]
     WebSocketError(String),
-    
+
+    #[error("WebSocket disconnected: {ws_key}")]
+    WebSocketDisconnected { ws_key: String },
+
     #[error("Serialization error: {0}")]
     SerializationError(String),
-    
+
+    #[error("{0}")]
+    Api(BybitApiError),
+
+    #[error("Auth error: {0}")]
+    AuthError(String),
+
     #[error("API error: {0}")]
     ApiError(String),
+
+    #[error("Time sync error: {0}")]
+    TimeSyncError(String),
+}
+
+impl ClientError {
+    pub fn ret_code(&self) -> Option<i64> {
+        match self { ClientError::Api(e) => Some(e.ret_code), _ => None }
+    }
+    pub fn is_retryable(&self) -> bool {
+        matches!(self, ClientError::HttpError(_) | ClientError::WebSocketDisconnected { .. } | ClientError::TimeSyncError(_))
+    }
 }
 
 // Core infrastructure

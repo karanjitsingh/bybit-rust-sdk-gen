@@ -1,12 +1,11 @@
-use crate::client::{ClientError, ClientResult};
+use crate::client::{BybitApiError, ClientError, ClientResult};
 use crate::client::config::ClientConfig;
 use crate::client::signing::{build_sign_string, get_timestamp_ms, serialize_params_for_signing, sign_hmac_sha256};
 use reqwest::{Client, Method};
 use serde_json::Value;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
-/// Base REST client implementation for Bybit API
-/// Handles HTTP requests, signing, and error handling
 pub struct BaseRestClient {
     config: ClientConfig,
     http_client: Client,
@@ -14,7 +13,6 @@ pub struct BaseRestClient {
 }
 
 impl BaseRestClient {
-    /// Create a new Base REST client
     pub fn new(config: ClientConfig) -> Result<Self, ClientError> {
         let http_client = Client::builder()
             .timeout(config.timeout)
@@ -25,170 +23,188 @@ impl BaseRestClient {
                 h
             })
             .build()
-            .map_err(|e| ClientError::HttpError(format!("Failed to create HTTP client: {}", e)))?;
-        
-        Ok(Self {
+            .map_err(|e| ClientError::HttpError(e.to_string()))?;
+
+        let client = Self {
             config,
             http_client,
             time_offset: Arc::new(Mutex::new(0)),
+        };
+
+        Ok(client)
+    }
+
+    /// Sync time with server. Call this before first private request or periodically.
+    pub async fn sync_time(&self) -> ClientResult<i64> {
+        let offset = self.fetch_time_offset().await?;
+        *self.time_offset.lock().await = offset;
+        Ok(offset)
+    }
+
+    /// Start periodic time sync in background (returns join handle)
+    pub fn start_time_sync(&self) -> tokio::task::JoinHandle<()> {
+        let offset = self.time_offset.clone();
+        let client = self.http_client.clone();
+        let base_url = self.config.base_url.clone();
+        let interval = self.config.sync_interval;
+        tokio::spawn(async move {
+            loop {
+                if let Ok(server_offset) = Self::fetch_time_offset_inner(&client, &base_url).await {
+                    *offset.lock().await = server_offset;
+                }
+                tokio::time::sleep(interval).await;
+            }
         })
     }
-    
-    /// Get adjusted timestamp accounting for time drift
-    fn get_adjusted_timestamp(&self) -> u64 {
-        let offset = *self.time_offset.lock().unwrap();
-        let timestamp = get_timestamp_ms();
-        
-        if offset >= 0 {
-            timestamp + (offset as u64)
-        } else {
-            timestamp.saturating_sub((-offset) as u64)
-        }
-    }
-    
-    /// Sign a request with API credentials
-    fn sign_request(
-        &self,
-        method: &str,
-        params: &Option<Value>,
-        timestamp: u64,
-    ) -> Result<String, ClientError> {
-        let api_secret = self.config.api_secret.as_ref()
-            .ok_or_else(|| ClientError::ApiError("API secret not configured".to_string()))?;
-        let api_key = self.config.api_key.as_ref()
-            .ok_or_else(|| ClientError::ApiError("API key not configured".to_string()))?;
 
-        // GET: sorted query string. POST/DELETE: JSON body string.
+    /// Estimate clock drift: server_time_ms - local_time_ms (adjusted for latency)
+    async fn fetch_time_offset(&self) -> ClientResult<i64> {
+        Self::fetch_time_offset_inner(&self.http_client, &self.config.base_url).await
+    }
+
+    async fn fetch_time_offset_inner(client: &Client, base_url: &str) -> ClientResult<i64> {
+        let start = get_timestamp_ms();
+        let url = format!("{}/v5/market/time", base_url);
+        let resp = client.get(&url).send().await
+            .map_err(|e| ClientError::TimeSyncError(e.to_string()))?;
+        let json: Value = resp.json().await
+            .map_err(|e| ClientError::TimeSyncError(e.to_string()))?;
+        let end = get_timestamp_ms();
+
+        let server_time_str = json.get("result")
+            .and_then(|r| r.get("timeSecond"))
+            .and_then(|v| v.as_str())
+            .or_else(|| json.get("result").and_then(|r| r.get("timeNano")).and_then(|v| v.as_str()));
+
+        let server_time_ms = match server_time_str {
+            Some(s) => {
+                let f: f64 = s.parse().map_err(|_| ClientError::TimeSyncError("Bad server time".into()))?;
+                if f > 1e15 { (f / 1e6) as i64 } // nanos
+                else { (f * 1000.0) as i64 } // seconds
+            }
+            None => return Err(ClientError::TimeSyncError("No time in response".into())),
+        };
+
+        let avg_latency = ((end - start) / 2) as i64;
+        Ok(server_time_ms - end as i64 + avg_latency)
+    }
+
+    fn get_adjusted_timestamp(&self, offset: i64) -> u64 {
+        let ts = get_timestamp_ms() as i64 + offset;
+        ts.max(0) as u64
+    }
+
+    fn sign_request(&self, method: &str, params: &Option<Value>, timestamp: u64) -> Result<String, ClientError> {
+        let api_secret = self.config.api_secret.as_ref()
+            .ok_or_else(|| ClientError::AuthError("API secret not configured".into()))?;
+        let api_key = self.config.api_key.as_ref()
+            .ok_or_else(|| ClientError::AuthError("API key not configured".into()))?;
+
         let params_str = match params {
             Some(p) if method == "GET" => serialize_params_for_signing(p),
-            Some(p) => serde_json::to_string(p)
-                .map_err(|e| ClientError::SerializationError(e.to_string()))?,
+            Some(p) => serde_json::to_string(p).map_err(|e| ClientError::SerializationError(e.to_string()))?,
             None => String::new(),
         };
 
         let sign_string = build_sign_string(timestamp, api_key, self.config.recv_window, &params_str);
-        sign_hmac_sha256(api_secret, &sign_string)
-            .map_err(|e| ClientError::ApiError(format!("Failed to sign request: {}", e)))
+        sign_hmac_sha256(api_secret, &sign_string).map_err(|e| ClientError::AuthError(e))
     }
-    
-    /// Make an HTTP request
-    async fn _call(
-        &self,
-        method: &str,
-        endpoint: &str,
-        params: Option<Value>,
-        is_public: bool,
-    ) -> ClientResult<Value> {
+
+    async fn _call(&self, method: &str, endpoint: &str, params: Option<Value>, is_public: bool) -> ClientResult<Value> {
+        // Auto-sync time before first private request if offset is 0 and time sync enabled
+        if !is_public && self.config.enable_time_sync {
+            let offset = *self.time_offset.lock().await;
+            if offset == 0 {
+                let _ = self.sync_time().await;
+            }
+        }
+
         let url = format!("{}{}", self.config.base_url, endpoint);
         let http_method = Method::from_bytes(method.as_bytes())
-            .map_err(|e| ClientError::HttpError(format!("Invalid HTTP method: {}", e)))?;
-        
-        let mut request = self.http_client.request(http_method.clone(), &url);
-        
-        // For private endpoints, add authentication headers
+            .map_err(|e| ClientError::HttpError(e.to_string()))?;
+
+        let mut request = self.http_client.request(http_method, &url);
+
         if !is_public {
             let api_key = self.config.api_key.as_ref()
-                .ok_or_else(|| ClientError::ApiError("API key not configured for private endpoint".to_string()))?;
-            
-            let timestamp = self.get_adjusted_timestamp();
+                .ok_or_else(|| ClientError::AuthError("API key not configured".into()))?;
+            let offset = *self.time_offset.lock().await;
+            let timestamp = self.get_adjusted_timestamp(offset);
             let signature = self.sign_request(method, &params, timestamp)?;
-            
+
             request = request
                 .header("X-BAPI-API-KEY", api_key)
                 .header("X-BAPI-TIMESTAMP", timestamp.to_string())
                 .header("X-BAPI-SIGN", signature)
                 .header("X-BAPI-RECV-WINDOW", self.config.recv_window.to_string());
         }
-        
-        // Add parameters based on HTTP method
+
         if method == "GET" {
-            if let Some(p) = params {
-                // Convert JSON params to query parameters
+            if let Some(ref p) = params {
                 if let Some(obj) = p.as_object() {
-                    let mut query_pairs: Vec<(String, String)> = Vec::new();
-                    for (key, value) in obj {
-                        let value_str = match value {
+                    let pairs: Vec<(String, String)> = obj.iter()
+                        .filter(|(_, v)| !v.is_null())
+                        .map(|(k, v)| (k.clone(), match v {
                             Value::String(s) => s.clone(),
-                            Value::Number(n) => n.to_string(),
-                            Value::Bool(b) => b.to_string(),
-                            Value::Null => continue,
-                            _ => serde_json::to_string(value)
-                                .map_err(|e| ClientError::SerializationError(e.to_string()))?,
-                        };
-                        query_pairs.push((key.clone(), value_str));
-                    }
-                    request = request.query(&query_pairs);
+                            Value::Null => String::new(),
+                            other => other.to_string().trim_matches('"').to_string(),
+                        }))
+                        .collect();
+                    request = request.query(&pairs);
                 }
             }
         } else {
-            // POST, PUT, DELETE use JSON body
             request = request.header("Content-Type", "application/json");
-            if let Some(p) = params {
-                request = request.json(&p);
+            if let Some(ref p) = params {
+                request = request.json(p);
             }
         }
-        
-        // Execute request
-        let response = request
-            .send()
-            .await
-            .map_err(|e| ClientError::HttpError(format!("Request failed: {}", e)))?;
-        
+
+        let response = request.send().await
+            .map_err(|e| ClientError::HttpError(e.to_string()))?;
+
         let status = response.status();
-        let body_text = response
-            .text()
-            .await
-            .map_err(|e| ClientError::HttpError(format!("Failed to read response body: {}", e)))?;
-        
-        // Parse JSON response
+        let body_text = response.text().await
+            .map_err(|e| ClientError::HttpError(e.to_string()))?;
+
         let json: Value = serde_json::from_str(&body_text)
-            .map_err(|e| ClientError::SerializationError(format!("Failed to parse JSON response: {}", e)))?;
-        
-        // Check for API errors
+            .map_err(|e| ClientError::SerializationError(e.to_string()))?;
+
         if !status.is_success() {
-            let error_msg = json.get("retMsg")
-                .and_then(|v| v.as_str())
-                .unwrap_or(&body_text);
-            return Err(ClientError::ApiError(format!("API error ({}): {}", status, error_msg)));
+            return Err(ClientError::HttpError(format!("HTTP {}: {}", status, body_text)));
         }
-        
-        // Check Bybit's retCode field
+
+        // Check Bybit retCode
         if let Some(ret_code) = json.get("retCode").and_then(|v| v.as_i64()) {
             if ret_code != 0 {
-                let error_msg = json.get("retMsg")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("Unknown error");
-                return Err(ClientError::ApiError(format!("API error {}: {}", ret_code, error_msg)));
+                let ret_msg = json.get("retMsg").and_then(|v| v.as_str()).unwrap_or("Unknown error").to_string();
+                return Err(ClientError::Api(BybitApiError {
+                    ret_code,
+                    ret_msg,
+                    raw_response: Some(json),
+                }));
             }
         }
-        
-        // Return the result field if present, otherwise return the whole response
-        Ok(json.get("result")
-            .cloned()
-            .unwrap_or(json))
+
+        Ok(json.get("result").cloned().unwrap_or(json))
     }
 
-    /// Make a private GET request
     pub async fn get_private(&self, endpoint: &str, params: Option<Value>) -> ClientResult<Value> {
         self._call("GET", endpoint, params, false).await
     }
-    
-    /// Make a private POST request
+
     pub async fn post_private(&self, endpoint: &str, params: Option<Value>) -> ClientResult<Value> {
         self._call("POST", endpoint, params, false).await
     }
-    
-    /// Make a private DELETE request
+
     pub async fn delete_private(&self, endpoint: &str, params: Option<Value>) -> ClientResult<Value> {
         self._call("DELETE", endpoint, params, false).await
     }
-    
-    /// Make a public GET request
+
     pub async fn get(&self, endpoint: &str, params: Option<Value>) -> ClientResult<Value> {
         self._call("GET", endpoint, params, true).await
     }
-    
-    /// Make a public POST request
+
     pub async fn post(&self, endpoint: &str, params: Option<Value>) -> ClientResult<Value> {
         self._call("POST", endpoint, params, true).await
     }
