@@ -974,13 +974,17 @@ for (const sourceFile of project.getSourceFiles()) {
                 // Add doc comments
                 for (const doc of method.docs) {
                     if (doc) {
-                        // Escape doc comments and split by newlines
                         const docLines = doc.split('\n');
+                        let prevWasListItem = false;
                         for (const line of docLines) {
                             if (line.trim()) {
-                                // Escape backslashes and fix apostrophes
                                 const escapedLine = line.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\t/g, '  ');
+                                const isListItem = /^\s*-\s/.test(escapedLine);
+                                if (prevWasListItem && !isListItem) {
+                                    clientCode += `    ///\n`;
+                                }
                                 clientCode += `    /// ${escapedLine}\n`;
+                                prevWasListItem = isListItem;
                             }
                         }
                     }
@@ -992,7 +996,7 @@ for (const sourceFile of project.getSourceFiles()) {
                     .map(p => p.isSelf ? p.name : `${p.name}: ${p.type}`)
                     .join(", ");
                 
-                clientCode += `    pub ${asyncKeyword}fn ${method.name}(${paramStr}) -> ClientResult<${method.returnType}> {\n`;
+                clientCode += `    pub ${asyncKeyword}fn ${method.name}(${paramStr}) -> ${method.rawReturnType ? method.returnType : `ClientResult<${method.returnType}>`} {\n`;
                 clientCode += `        ${method.body}\n`;
                 clientCode += `    }\n\n`;
             }

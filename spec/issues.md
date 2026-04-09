@@ -1,6 +1,6 @@
 # Bybit Rust SDK - Transpiler Issues Tracker
 
-## Status: ✅ Compiles — 0 errors, 57 warnings (all benign)
+## Status: ✅ Compiles — 0 errors, 0 warnings, 0 clippy warnings
 
 `bybit-api` submodule now on latest master (`1589319`, PR #536+).
 
@@ -41,9 +41,9 @@ signature. Fixes use the existing registries and never emit duplicate structs.
 - Total generated types: 891
 - Total files: 56
 - Compilation: 0 errors, 0 warnings
-- Clippy: 3 warnings (doc list item indentation — cosmetic)
+- Clippy: 0 warnings
 - Skipped types: 7 (complex TS-only constructs)
-- Remaining stubs: 5 (4 abstract `unimplemented!()` + 1 `getWSClient` needs signature change)
+- Remaining stubs: 4 abstract `unimplemented!()` (by design)
 - Struct fields: camelCase → snake_case with `#[serde(rename)]`
 
 ---
@@ -180,17 +180,9 @@ fileStructure.ts, fileGenerator.ts, parser.ts
 
 ## Remaining
 
-### Issue 12: ✅ Method stubs implemented (5 remaining — 4 abstract + 1 signature issue)
+### Issue 12: ✅ All method stubs implemented
 All non-abstract stubs implemented via `knownImpls` map in `bybitClientHandlers.ts`.
+`getWSClient` returns `&'a WebsocketClient<'a>` via `rawReturnType` flag + `returnTypeOverrides` map.
 
-Implemented methods: `getClientType` (×2), `fetchServerTime` (×2), `setTimeOffsetMs`,
-`fetchLatencySummary`, `sendPingEvent`, `sendPongEvent`, `getPrivateWSKeys`,
-`isAuthOnConnectWsKey`, `authPrivateConnectionsOnConnect`, `isCustomReconnectionNeeded`,
-`triggerCustomReconnectionWorkflow`, `isWsPing`, `isWsPong`, `getMaxTopicsPerSubscribeEvent`,
-`isPrivateTopicRequest`, `connectWSAPI`, `connectPublic`, `connectPrivate`, `getWsUrl`,
-`subscribeV5`, `unsubscribeV5`, `subscribe`, `unsubscribe`, `resolveEmittableEvents`,
-`uploadP2PChatFile` (returns error — needs multipart).
-
-Remaining:
-- 4 abstract methods (`connectAll`, `sendWSAPIRequest`, `getWsAuthRequestEvent`, `getWsRequestEvents`) — `unimplemented!()` by design
-- `getWSClient` — needs return type changed from `ClientResult<WebsocketClient>` to `&WebsocketClient`
+Only 4 abstract methods remain (`connectAll`, `sendWSAPIRequest`, `getWsAuthRequestEvent`,
+`getWsRequestEvents`) — `unimplemented!()` by design, to be overridden by subclasses.

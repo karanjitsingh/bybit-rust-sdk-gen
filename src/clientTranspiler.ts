@@ -33,6 +33,7 @@ export interface RustMethod {
   body: string;
   docs: string[];
   isAsync: boolean;
+  rawReturnType?: boolean;
 }
 
 export interface RustParameter {

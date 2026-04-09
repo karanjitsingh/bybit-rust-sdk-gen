@@ -35,9 +35,16 @@ function convertJSDocToRust(jsDocs: JSDoc[]): { docComment: string, isDeprecated
 
         // Split into lines and convert to Rust doc comments
         const commentLines = commentText.split('\n').map(line => line.trim());
+        let prevWasListItem = false;
         for (const line of commentLines) {
             if (line) {
-                lines.push(`/// ${line.replace(/\t/g, '  ')}`);
+                const cleaned = line.replace(/\t/g, '  ');
+                const isListItem = /^\s*-\s/.test(cleaned);
+                if (prevWasListItem && !isListItem) {
+                    lines.push(`///`);
+                }
+                lines.push(`/// ${cleaned}`);
+                prevWasListItem = isListItem;
             }
         }
     }

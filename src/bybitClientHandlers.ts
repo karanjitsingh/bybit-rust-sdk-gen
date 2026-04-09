@@ -507,7 +507,7 @@ function generateRustMethod(
       "uploadP2PChatFile": `Err(crate::client::ClientError::ApiError("uploadP2PChatFile requires multipart upload - not yet implemented".to_string()))`,
       // WebsocketAPIClient
       "setTimeOffsetMs": `Ok(())`,
-      "getWSClient": `todo!("getWSClient needs signature change to return reference")`,
+      "getWSClient": `self.ws_client`,
       // WebsocketClient simple methods
       "sendPingEvent": `self.base.try_ws_send(&format!("{:?}", wsKey), &serde_json::json!({"op": "ping"}).to_string())`,
       "sendPongEvent": `self.base.try_ws_send(&format!("{:?}", wsKey), &serde_json::json!({"op": "pong"}).to_string())`,
@@ -541,6 +541,17 @@ function generateRustMethod(
     }
   }
 
+  // Return type overrides for methods that need different signatures
+  const returnTypeOverrides: Record<string, { type: string, raw?: boolean }> = {
+    "getWSClient": { type: `&'a WebsocketClient<'a>`, raw: true },
+  };
+  const override = returnTypeOverrides[parsedMethod.name];
+  let rawReturnType = false;
+  if (override) {
+    returnType = override.type;
+    rawReturnType = override.raw || false;
+  }
+
   return {
     name: rustName,
     params,
@@ -548,6 +559,7 @@ function generateRustMethod(
     body,
     docs: parsedMethod.jsDocs,
     isAsync: parsedMethod.isAsync,
+    rawReturnType,
   };
 }
 
