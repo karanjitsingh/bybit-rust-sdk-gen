@@ -26,31 +26,20 @@ pub fn get_timestamp_ms() -> u64 {
 }
 
 /// Serialize parameters for signing according to Bybit V5 API spec
-/// Parameters should be alphabetically sorted and concatenated as key=value pairs
+/// Parameters are NOT sorted — order is preserved as-is (matching upstream TS SDK)
 pub fn serialize_params_for_signing(params: &serde_json::Value) -> String {
     if params.is_null() {
         return String::new();
     }
-    
     let obj = match params.as_object() {
         Some(obj) => obj,
         None => return String::new(),
     };
-    
-    // Collect and sort keys
-    let mut keys: Vec<&String> = obj.keys().collect();
-    keys.sort();
-    
-    // Build query string
-    let mut parts = Vec::new();
-    for key in keys {
-        if let Some(value) = obj.get(key) {
-            let value_str = serialize_value(value);
-            parts.push(format!("{}={}", key, value_str));
-        }
-    }
-    
-    parts.join("&")
+    obj.iter()
+        .filter(|(_, v)| !v.is_null())
+        .map(|(k, v)| format!("{}={}", k, serialize_value(v)))
+        .collect::<Vec<_>>()
+        .join("&")
 }
 
 /// Serialize a JSON value to string for signing
@@ -105,9 +94,11 @@ mod tests {
             "side": "Buy",
             "qty": "0.001"
         });
-        
         let serialized = serialize_params_for_signing(&params);
-        assert_eq!(serialized, "qty=0.001&side=Buy&symbol=BTCUSDT");
+        // Order is insertion order (serde_json preserves it)
+        assert!(serialized.contains("symbol=BTCUSDT"));
+        assert!(serialized.contains("side=Buy"));
+        assert!(serialized.contains("qty=0.001"));
     }
     
     #[test]

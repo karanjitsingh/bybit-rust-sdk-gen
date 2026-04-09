@@ -19,6 +19,11 @@ impl BaseRestClient {
         let http_client = Client::builder()
             .timeout(config.timeout)
             .user_agent(&config.user_agent)
+            .default_headers({
+                let mut h = reqwest::header::HeaderMap::new();
+                h.insert("x-referer", reqwest::header::HeaderValue::from_static("bybitapirust"));
+                h
+            })
             .build()
             .map_err(|e| ClientError::HttpError(format!("Failed to create HTTP client: {}", e)))?;
         
@@ -44,31 +49,24 @@ impl BaseRestClient {
     /// Sign a request with API credentials
     fn sign_request(
         &self,
+        method: &str,
         params: &Option<Value>,
         timestamp: u64,
     ) -> Result<String, ClientError> {
         let api_secret = self.config.api_secret.as_ref()
             .ok_or_else(|| ClientError::ApiError("API secret not configured".to_string()))?;
-        
         let api_key = self.config.api_key.as_ref()
             .ok_or_else(|| ClientError::ApiError("API key not configured".to_string()))?;
-        
-        // Serialize parameters
-        let params_str = if let Some(p) = params {
-            serialize_params_for_signing(p)
-        } else {
-            String::new()
+
+        // GET: sorted query string. POST/DELETE: JSON body string.
+        let params_str = match params {
+            Some(p) if method == "GET" => serialize_params_for_signing(p),
+            Some(p) => serde_json::to_string(p)
+                .map_err(|e| ClientError::SerializationError(e.to_string()))?,
+            None => String::new(),
         };
-        
-        // Build sign string: timestamp + api_key + recv_window + params
-        let sign_string = build_sign_string(
-            timestamp,
-            api_key,
-            self.config.recv_window,
-            &params_str,
-        );
-        
-        // Sign with HMAC-SHA256
+
+        let sign_string = build_sign_string(timestamp, api_key, self.config.recv_window, &params_str);
         sign_hmac_sha256(api_secret, &sign_string)
             .map_err(|e| ClientError::ApiError(format!("Failed to sign request: {}", e)))
     }
@@ -93,7 +91,7 @@ impl BaseRestClient {
                 .ok_or_else(|| ClientError::ApiError("API key not configured for private endpoint".to_string()))?;
             
             let timestamp = self.get_adjusted_timestamp();
-            let signature = self.sign_request(&params, timestamp)?;
+            let signature = self.sign_request(method, &params, timestamp)?;
             
             request = request
                 .header("X-BAPI-API-KEY", api_key)

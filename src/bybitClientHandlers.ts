@@ -494,11 +494,8 @@ function generateRustMethod(
     }
 
     body = `self.ws_client.send_ws_api_request(Some(WsKey::${wsKeyToEnumVariant(impl.wsKey || "")}), serde_json::Value::String("${wsOperation}".to_string()), ${paramsArg}, None).await`;
-  } else if (impl.type === "abstract") {
-    // Abstract methods should be implemented by subclasses
-    body = `unimplemented!("Abstract method '${parsedMethod.name}' must be implemented by subclass")`;
   } else {
-    // Check for known simple implementations
+    // Check for known implementations (including abstract overrides)
     const knownImpls: Record<string, string> = {
       // RestClientV5 / SpotClientV3
       "getClientType": `Ok("v5".to_string())`,
@@ -530,12 +527,19 @@ function generateRustMethod(
       "unsubscribeV5": `let topics: Vec<String> = wsTopics.iter().filter_map(|t| t.as_str().map(String::from)).collect();\nself.base.subscribe(topics).await.map(|_| vec![])`,
       "subscribe": `Ok(())`,
       "unsubscribe": `Ok(())`,
+      // Abstract method implementations (were unimplemented!, now real)
+      "connectAll": `let mut results = Vec::new();\nfor k in &["v5SpotPublic", "v5LinearPublic", "v5InversePublic", "v5OptionPublic"] {\n    match self.base.connect(k).await {\n        Ok(_) => results.push(Some(serde_json::Value::Null)),\n        Err(_) => results.push(None),\n    }\n}\nlet _ = self.base.connect("v5Private").await;\nOk(results)`,
+      "sendWSAPIRequest": `let ws_key_str = match wsKey {\n    Some(WsKey::V5Private) => "v5Private",\n    Some(WsKey::V5PrivateTrade) => "v5PrivateTrade",\n    _ => "v5PrivateTrade",\n};\nlet op_str = operation.as_str().unwrap_or("unknown");\nself.base.send_ws_api_request(ws_key_str, op_str, params).await`,
+      "getWsAuthRequestEvent": `use crate::client::signing::{get_timestamp_ms, sign_hmac_sha256};\nuse crate::types::websockets::ws_api::inline::WsRequestOperationBybit_Args;\nlet api_key = self.base.config().api_key.as_ref()\n    .ok_or_else(|| crate::client::ClientError::ApiError("API key required".to_string()))?.clone();\nlet api_secret = self.base.config().api_secret.as_ref()\n    .ok_or_else(|| crate::client::ClientError::ApiError("API secret required".to_string()))?.clone();\nlet expires = get_timestamp_ms() + self.base.config().recv_window;\nlet sign_str = format!("GET/realtime{}", expires);\nlet signature = sign_hmac_sha256(&api_secret, &sign_str)\n    .map_err(|e| crate::client::ClientError::ApiError(e))?;\nOk(WsRequestOperationBybit {\n    req_id: format!("{:?}-auth", wsKey),\n    op: WsOperation::auth,\n    args: Some(vec![\n        WsRequestOperationBybit_Args::StringValue(api_key),\n        WsRequestOperationBybit_Args::Number(expires as f64),\n        WsRequestOperationBybit_Args::StringValue(signature),\n    ]),\n})`,
+      "getWsRequestEvents": `let topics: Vec<String> = requests.iter().map(|r| r.topic.clone()).collect();\nlet req_id = if matches!(operation, WsOperation::subscribe | WsOperation::unsubscribe) && !topics.is_empty() {\n    topics.join(",")\n} else {\n    format!("req_{}", crate::client::signing::get_timestamp_ms())\n};\nlet ws_event = WsRequestOperationBybit {\n    req_id: req_id.clone(),\n    op: operation,\n    args: Some(topics.into_iter().map(|t| crate::types::websockets::ws_api::inline::WsRequestOperationBybit_Args::StringValue(t)).collect()),\n};\nOk(vec![MidflightWsRequestEvent {\n    request_key: req_id,\n    request_event: ws_event,\n}])`,
       // resolveEmittableEvents
       "resolveEmittableEvents": `let topic = event.get("topic").and_then(|v| v.as_str());\nlet op = event.get("op").and_then(|v| v.as_str());\nlet ret_code = event.get("retCode").and_then(|v| v.as_i64());\nlet req_id = event.get("reqId");\nlet make_event = |et: &str, ev: serde_json::Value, ws_api: Option<bool>| -> EmittableEvent<String> {\n    EmittableEvent { event_type: crate::util::inline::EmittableEvent_EventType::connectionReady(et.to_string()), event: ev, is_ws_api_response: ws_api }\n};\n// WS API response\nif let (Some(rc), Some(_)) = (ret_code, req_id) {\n    let et = if rc != 0 { "exception" } else { "response" };\n    return Ok(vec![make_event(et, event, Some(true))]);\n}\n// Topic update\nif topic.is_some() {\n    return Ok(vec![make_event("update", event, None)]);\n}\n// Operation response\nif let Some(op_str) = op {\n    let et = match op_str {\n        "auth" => "authenticated",\n        "subscribe" | "unsubscribe" | "ping" | "pong" | "COMMAND_RESP" => "response",\n        _ => if event.get("success") == Some(&serde_json::Value::Bool(false)) { "exception" } else { "update" },\n    };\n    return Ok(vec![make_event(et, event, None)]);\n}\nOk(vec![make_event("update", event, None)])`,
     };
 
     if (knownImpls[parsedMethod.name]) {
       body = knownImpls[parsedMethod.name];
+    } else if (impl.type === "abstract") {
+      body = `unimplemented!("Abstract method '${parsedMethod.name}' must be implemented by subclass")`;
     } else {
       body = `todo!("Method implementation: ${parsedMethod.name}")`;
     }
