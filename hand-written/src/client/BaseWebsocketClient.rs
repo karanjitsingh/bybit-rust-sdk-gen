@@ -4,13 +4,13 @@ use crate::client::config::ClientConfig;
 /// Base WebSocket client implementation for Bybit API
 /// Handles WebSocket connections, authentication, and message handling
 pub struct BaseWebsocketClient {
-    config: ClientConfig,
+    _config: ClientConfig,
 }
 
 impl BaseWebsocketClient {
     /// Create a new Base WebSocket client
     pub fn new(config: ClientConfig) -> Result<Self, ClientError> {
-        Ok(Self { config })
+        Ok(Self { _config: config })
     }
     
     /// Connect to WebSocket endpoint

@@ -4,7 +4,7 @@
 
 import { Node, JSDoc } from "ts-morph";
 import { StructMember, EnumVariant } from "./types";
-import { makeValidRustIdent, escapeRustKeyword, RUST_KEYWORDS } from "./utils";
+import { makeValidRustIdent, escapeRustKeyword, RUST_KEYWORDS, toSnakeCase } from "./utils";
 import * as console from "./console";
 import * as BybitHandlers from "./bybitHandlers";
 
@@ -37,7 +37,7 @@ function convertJSDocToRust(jsDocs: JSDoc[]): { docComment: string, isDeprecated
         const commentLines = commentText.split('\n').map(line => line.trim());
         for (const line of commentLines) {
             if (line) {
-                lines.push(`/// ${line}`);
+                lines.push(`/// ${line.replace(/\t/g, '  ')}`);
             }
         }
     }
@@ -546,6 +546,16 @@ export function convertInterface(interfaceName: string, members: StructMember[],
         // Start with the original name
         let rustFieldName = memberName;
         let needsRename = false;
+
+        // Convert camelCase to snake_case, but only for multi-char names with mixed case
+        // Skip single chars and names that are already snake_case or UPPER_CASE
+        if (memberName.length > 1 && /[a-z][A-Z]/.test(memberName)) {
+            const snakeName = toSnakeCase(memberName);
+            if (snakeName !== memberName) {
+                rustFieldName = snakeName;
+                needsRename = true;
+            }
+        }
 
         // Only transform if it contains invalid Rust identifier characters
         if (/[^a-zA-Z0-9_]/.test(rustFieldName)) {

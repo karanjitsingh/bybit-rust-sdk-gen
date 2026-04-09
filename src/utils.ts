@@ -91,3 +91,21 @@ export function rustFileToModulePath(rustFilePath: string): string {
     }).join('::');
 }
 
+
+export function toSnakeCase(str: string): string {
+  const acronyms: [string, string][] = [
+    ['UID', '~uid~'], ['API', '~api~'], ['HTTP', '~http~'],
+    ['HTTPS', '~https~'], ['URL', '~url~'], ['URI', '~uri~'],
+    ['UUID', '~uuid~'], ['WS', '~ws~'], ['WSS', '~wss~'],
+  ];
+  let result = str;
+  for (const [acronym, placeholder] of acronyms) {
+    result = result.replace(new RegExp(acronym, 'g'), placeholder);
+  }
+  result = result
+    .replace(/([a-z\d])([A-Z~])/g, "$1_$2")
+    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2")
+    .toLowerCase();
+  result = result.replace(/~/g, '');
+  return result;
+}

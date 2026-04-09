@@ -40,9 +40,11 @@ signature. Fixes use the existing registries and never emit duplicate structs.
 ## Build Stats
 - Total generated types: 891
 - Total files: 56
-- Compilation: 0 errors, 40 warnings (all benign)
+- Compilation: 0 errors, 0 warnings
+- Clippy: 3 warnings (doc list item indentation — cosmetic)
 - Skipped types: 7 (complex TS-only constructs)
 - Remaining stubs: 5 (4 abstract `unimplemented!()` + 1 `getWSClient` needs signature change)
+- Struct fields: camelCase → snake_case with `#[serde(rename)]`
 
 ---
 

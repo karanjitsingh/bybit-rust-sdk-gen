@@ -979,7 +979,7 @@ for (const sourceFile of project.getSourceFiles()) {
                         for (const line of docLines) {
                             if (line.trim()) {
                                 // Escape backslashes and fix apostrophes
-                                const escapedLine = line.replace(/\\/g, '\\\\').replace(/`/g, '\\`');
+                                const escapedLine = line.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\t/g, '  ');
                                 clientCode += `    /// ${escapedLine}\n`;
                             }
                         }

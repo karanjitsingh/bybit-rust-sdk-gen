@@ -15,7 +15,7 @@ import {
   MethodImplementation,
 } from "./clientTranspiler";
 import { TypeRegistry } from "./typeRegistry";
-import { makeValidRustIdent } from "./utils";
+import { makeValidRustIdent, toSnakeCase } from "./utils";
 import * as console from "./console";
 
 /**
@@ -351,41 +351,6 @@ function convertTypeToRust(
  * Convert camelCase to snake_case
  * Handles acronyms properly (API -> api, UID -> uid, not a_p_i or u_i_d)
  */
-function toSnakeCase(str: string): string {
-  // First, handle known acronyms by temporarily replacing them
-  const acronyms: [string, string][] = [
-    ['UID', '~uid~'],
-    ['API', '~api~'],
-    ['HTTP', '~http~'],
-    ['HTTPS', '~https~'],
-    ['URL', '~url~'],
-    ['URI', '~uri~'],
-    ['UUID', '~uuid~'],
-    ['WS', '~ws~'],
-    ['WSS', '~wss~'],
-  ];
-  
-  let result = str;
-  
-  // Replace acronyms with placeholders
-  for (const [acronym, placeholder] of acronyms) {
-    result = result.replace(new RegExp(acronym, 'g'), placeholder);
-  }
-  
-  // Now do standard snake_case conversion
-  result = result
-    // Insert underscore before uppercase letters that follow lowercase/digit  
-    .replace(/([a-z\d])([A-Z~])/g, "$1_$2")
-    // Insert underscore before uppercase letter followed by lowercase (handles remaining acronyms)
-    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2")
-    .toLowerCase();
-  
-  // Restore acronyms by removing placeholders
-  result = result.replace(/~/g, '');
-  
-  return result;
-}
-
 /**
  * Convert className to PascalCase struct name
  * e.g., RestClientV5 -> RestClientV5, BaseRestClient -> BaseRestClient
@@ -559,14 +524,14 @@ function generateRustMethod(
       "connectWSAPI": `self.base.connect("v5PrivateTrade").await.map(|_| serde_json::Value::Null)`,
       "connectPublic": `let keys = ["v5SpotPublic", "v5LinearPublic", "v5InversePublic", "v5OptionPublic"];\nlet mut results = Vec::new();\nfor k in &keys {\n    match self.base.connect(k).await {\n        Ok(_) => results.push(Some(serde_json::Value::Null)),\n        Err(_) => results.push(None),\n    }\n}\nOk(results)`,
       "connectPrivate": `self.base.connect("v5Private").await.map(|_| serde_json::Value::Null)`,
-      "getWsUrl": `let base_url = match wsKey {\n    WsKey::V5Private | WsKey::V5PrivateTrade => "wss://stream.bybit.com/v5/private",\n    WsKey::V5SpotPublic => "wss://stream.bybit.com/v5/public/spot",\n    WsKey::V5LinearPublic => "wss://stream.bybit.com/v5/public/linear",\n    WsKey::V5InversePublic => "wss://stream.bybit.com/v5/public/inverse",\n    WsKey::V5OptionPublic => "wss://stream.bybit.com/v5/public/option",\n    _ => "wss://stream.bybit.com/v5/public/spot",\n};\nOk(base_url.to_string())`,
+      "getWsUrl": `let base_url = match wsKey {\n    WsKey::V5Private | WsKey::V5PrivateTrade => "wss://stream.bybit.com/v5/private",\n    WsKey::V5SpotPublic => "wss://stream.bybit.com/v5/public/spot",\n    WsKey::V5LinearPublic => "wss://stream.bybit.com/v5/public/linear",\n    WsKey::V5InversePublic => "wss://stream.bybit.com/v5/public/inverse",\n    WsKey::V5OptionPublic => "wss://stream.bybit.com/v5/public/option",\n};\nOk(base_url.to_string())`,
       // WebsocketClient subscribe/unsubscribe (delegate to base)
       "subscribeV5": `let topics: Vec<String> = wsTopics.iter().filter_map(|t| t.as_str().map(String::from)).collect();\nself.base.subscribe(topics).await.map(|_| vec![])`,
       "unsubscribeV5": `let topics: Vec<String> = wsTopics.iter().filter_map(|t| t.as_str().map(String::from)).collect();\nself.base.subscribe(topics).await.map(|_| vec![])`,
       "subscribe": `Ok(())`,
       "unsubscribe": `Ok(())`,
       // resolveEmittableEvents
-      "resolveEmittableEvents": `let topic = event.get("topic").and_then(|v| v.as_str());\nlet op = event.get("op").and_then(|v| v.as_str());\nlet ret_code = event.get("retCode").and_then(|v| v.as_i64());\nlet req_id = event.get("reqId");\nlet make_event = |et: &str, ev: serde_json::Value, ws_api: Option<bool>| -> EmittableEvent<String> {\n    EmittableEvent { eventType: crate::util::inline::EmittableEvent_EventType::connectionReady(et.to_string()), event: ev, isWSAPIResponse: ws_api }\n};\n// WS API response\nif ret_code.is_some() && req_id.is_some() {\n    let et = if ret_code.unwrap() != 0 { "exception" } else { "response" };\n    return Ok(vec![make_event(et, event, Some(true))]);\n}\n// Topic update\nif topic.is_some() {\n    return Ok(vec![make_event("update", event, None)]);\n}\n// Operation response\nif let Some(op_str) = op {\n    let et = match op_str {\n        "auth" => "authenticated",\n        "subscribe" | "unsubscribe" | "ping" | "pong" | "COMMAND_RESP" => "response",\n        _ => if event.get("success") == Some(&serde_json::Value::Bool(false)) { "exception" } else { "update" },\n    };\n    return Ok(vec![make_event(et, event, None)]);\n}\nOk(vec![make_event("update", event, None)])`,
+      "resolveEmittableEvents": `let topic = event.get("topic").and_then(|v| v.as_str());\nlet op = event.get("op").and_then(|v| v.as_str());\nlet ret_code = event.get("retCode").and_then(|v| v.as_i64());\nlet req_id = event.get("reqId");\nlet make_event = |et: &str, ev: serde_json::Value, ws_api: Option<bool>| -> EmittableEvent<String> {\n    EmittableEvent { event_type: crate::util::inline::EmittableEvent_EventType::connectionReady(et.to_string()), event: ev, is_ws_api_response: ws_api }\n};\n// WS API response\nif let (Some(rc), Some(_)) = (ret_code, req_id) {\n    let et = if rc != 0 { "exception" } else { "response" };\n    return Ok(vec![make_event(et, event, Some(true))]);\n}\n// Topic update\nif topic.is_some() {\n    return Ok(vec![make_event("update", event, None)]);\n}\n// Operation response\nif let Some(op_str) = op {\n    let et = match op_str {\n        "auth" => "authenticated",\n        "subscribe" | "unsubscribe" | "ping" | "pong" | "COMMAND_RESP" => "response",\n        _ => if event.get("success") == Some(&serde_json::Value::Bool(false)) { "exception" } else { "update" },\n    };\n    return Ok(vec![make_event(et, event, None)]);\n}\nOk(vec![make_event("update", event, None)])`,
     };
 
     if (knownImpls[parsedMethod.name]) {
