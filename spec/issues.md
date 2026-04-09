@@ -42,8 +42,8 @@ signature. Fixes use the existing registries and never emit duplicate structs.
 - Total files: 56
 - Compilation: 0 errors, 0 warnings
 - Clippy: 0 warnings
-- Skipped types: 7 (complex TS-only constructs)
-- Remaining stubs: 4 abstract `unimplemented!()` (by design)
+- Tests: 4 passing
+- Remaining stubs: 0
 - Struct fields: camelCase → snake_case with `#[serde(rename)]`
 
 ---
@@ -180,9 +180,8 @@ fileStructure.ts, fileGenerator.ts, parser.ts
 
 ## Remaining
 
-### Issue 12: ✅ All method stubs implemented
-All non-abstract stubs implemented via `knownImpls` map in `bybitClientHandlers.ts`.
-`getWSClient` returns `&'a WebsocketClient<'a>` via `rawReturnType` flag + `returnTypeOverrides` map.
-
-Only 4 abstract methods remain (`connectAll`, `sendWSAPIRequest`, `getWsAuthRequestEvent`,
-`getWsRequestEvents`) — `unimplemented!()` by design, to be overridden by subclasses.
+### Issue 12: ✅ All methods implemented — zero stubs
+All methods implemented via `knownImpls` map including the 4 formerly-abstract methods
+(`connectAll`, `sendWSAPIRequest`, `getWsAuthRequestEvent`, `getWsRequestEvents`).
+`getWSClient` returns `&'a WebsocketClient<'a>` via `rawReturnType` flag.
+Hand-written files provide real HTTP/WS I/O via reqwest and tokio-tungstenite.
