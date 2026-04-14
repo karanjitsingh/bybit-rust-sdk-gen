@@ -12,15 +12,13 @@ type WsSink = futures_util::stream::SplitSink<
     Message,
 >;
 
-struct WsConnection {
-    sink: WsSink,
-    subscribed_topics: Vec<String>,
-}
-
 /// Base WebSocket client with auto-reconnect and topic resubscription
 pub struct BaseWebsocketClient {
     config: ClientConfig,
-    connections: Arc<Mutex<HashMap<String, WsConnection>>>,
+    /// Active WS sinks (removed on disconnect, re-inserted on reconnect)
+    sinks: Arc<Mutex<HashMap<String, WsSink>>>,
+    /// Topic state survives disconnects — never cleared except by unsubscribe
+    topics: Arc<Mutex<HashMap<String, Vec<String>>>>,
     event_tx: mpsc::UnboundedSender<(String, String)>,
     event_rx: Arc<Mutex<mpsc::UnboundedReceiver<(String, String)>>>,
     shutdown: Arc<Notify>,
@@ -31,7 +29,8 @@ impl BaseWebsocketClient {
         let (event_tx, event_rx) = mpsc::unbounded_channel();
         Ok(Self {
             config,
-            connections: Arc::new(Mutex::new(HashMap::new())),
+            sinks: Arc::new(Mutex::new(HashMap::new())),
+            topics: Arc::new(Mutex::new(HashMap::new())),
             event_tx,
             event_rx: Arc::new(Mutex::new(event_rx)),
             shutdown: Arc::new(Notify::new()),
@@ -44,104 +43,103 @@ impl BaseWebsocketClient {
         } else {
             "wss://stream.bybit.com"
         };
+        format!("{}/v5/{}", base, Self::ws_path(ws_key))
+    }
+
+    fn ws_path(ws_key: &str) -> &str {
         match ws_key {
-            "v5Private" | "v5PrivateTrade" => format!("{}/v5/private", base),
-            "v5SpotPublic" => format!("{}/v5/public/spot", base),
-            "v5LinearPublic" => format!("{}/v5/public/linear", base),
-            "v5InversePublic" => format!("{}/v5/public/inverse", base),
-            "v5OptionPublic" => format!("{}/v5/public/option", base),
-            _ => format!("{}/v5/public/spot", base),
+            "v5Private" | "v5PrivateTrade" => "private",
+            "v5SpotPublic" => "public/spot",
+            "v5LinearPublic" => "public/linear",
+            "v5InversePublic" => "public/inverse",
+            "v5OptionPublic" => "public/option",
+            _ => "public/spot",
         }
     }
 
+    /// Connect and start the reconnect monitor for this ws_key
     pub async fn connect(&self, ws_key: &str) -> ClientResult<()> {
-        self.connect_inner(ws_key).await?;
-        self.spawn_reader(ws_key.to_string());
+        self.connect_and_setup(ws_key).await?;
+        self.spawn_reconnect_monitor(ws_key.to_string());
         Ok(())
     }
 
-    async fn connect_inner(&self, ws_key: &str) -> ClientResult<()> {
+    /// Establish WS connection, auth if private, resubscribe tracked topics
+    async fn connect_and_setup(&self, ws_key: &str) -> ClientResult<()> {
         let url = self.ws_url(ws_key);
         let (ws_stream, _) = tokio_tungstenite::connect_async(&url)
             .await
             .map_err(|e| ClientError::WebSocketError(format!("Connect failed: {}", e)))?;
 
         let (sink, stream) = ws_stream.split();
+        self.sinks.lock().await.insert(ws_key.to_string(), sink);
 
-        // Preserve existing subscribed topics for reconnect
-        let topics = {
-            let mut conns = self.connections.lock().await;
-            let old_topics = conns.get(ws_key)
-                .map(|c| c.subscribed_topics.clone())
-                .unwrap_or_default();
-            conns.insert(ws_key.to_string(), WsConnection { sink, subscribed_topics: old_topics.clone() });
-            old_topics
-        };
-
-        // Auth for private connections
         if ws_key.contains("Private") {
             self.authenticate(ws_key).await?;
         }
 
-        // Resubscribe to previously subscribed topics
-        if !topics.is_empty() {
-            self.send_subscribe(ws_key, &topics)?;
+        // Resubscribe to tracked topics
+        let tracked = self.topics.lock().await.get(ws_key).cloned().unwrap_or_default();
+        if !tracked.is_empty() {
+            self.send_subscribe(ws_key, &tracked)?;
         }
 
-        // Store the stream for the reader to pick up
-        // We use a separate channel to pass the stream to the reader task
+        self.spawn_stream_reader(ws_key.to_string(), stream);
         let _ = self.event_tx.send((ws_key.to_string(), format!("{{\"_internal\":\"connected\",\"wsKey\":\"{}\"}}", ws_key)));
+        Ok(())
+    }
 
-        // Spawn a task to read from this specific stream
+    /// Read from a WS stream, emit events, signal disconnect on close/error
+    fn spawn_stream_reader(
+        &self,
+        ws_key: String,
+        stream: futures_util::stream::SplitStream<
+            tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>,
+        >,
+    ) {
         let tx = self.event_tx.clone();
-        let conns = self.connections.clone();
-        let ws_key_owned = ws_key.to_string();
+        let sinks = self.sinks.clone();
         tokio::spawn(async move {
             let mut stream = stream;
             while let Some(msg) = stream.next().await {
                 match msg {
-                    Ok(Message::Text(text)) => { let _ = tx.send((ws_key_owned.clone(), text.to_string())); }
-                    Ok(Message::Ping(_)) => { let _ = tx.send((ws_key_owned.clone(), r#"{"op":"ping"}"#.to_string())); }
+                    Ok(Message::Text(text)) => { let _ = tx.send((ws_key.clone(), text.to_string())); }
+                    Ok(Message::Ping(_)) => { let _ = tx.send((ws_key.clone(), r#"{"op":"ping"}"#.to_string())); }
                     Ok(Message::Close(_)) | Err(_) => {
-                        // Signal disconnect
-                        let _ = tx.send((ws_key_owned.clone(), format!("{{\"_internal\":\"disconnected\",\"wsKey\":\"{}\"}}", ws_key_owned)));
-                        // Remove the sink so reconnect creates a fresh one
-                        conns.lock().await.remove(&ws_key_owned);
+                        let _ = tx.send((ws_key.clone(), format!("{{\"_internal\":\"disconnected\",\"wsKey\":\"{}\"}}", ws_key)));
+                        sinks.lock().await.remove(&ws_key);
                         break;
                     }
                     _ => {}
                 }
             }
         });
-
-        Ok(())
     }
 
-    /// Spawn a reconnection loop for a ws_key
-    fn spawn_reader(&self, ws_key: String) {
-        let conns = self.connections.clone();
+    /// Monitor for disconnects and reconnect with exponential backoff
+    fn spawn_reconnect_monitor(&self, ws_key: String) {
+        let sinks = self.sinks.clone();
+        let topics = self.topics.clone();
         let config = self.config.clone();
         let event_tx = self.event_tx.clone();
         let shutdown = self.shutdown.clone();
 
         tokio::spawn(async move {
             let mut backoff_ms: u64 = 500;
-            const MAX_BACKOFF_MS: u64 = 30_000;
+            const MAX_BACKOFF: u64 = 30_000;
 
             loop {
-                // Wait for disconnect signal
-                let mut rx_check = tokio::time::interval(tokio::time::Duration::from_secs(1));
+                // Poll until disconnected
                 loop {
-                    rx_check.tick().await;
-                    let has_conn = conns.lock().await.contains_key(&ws_key);
-                    if !has_conn {
-                        break; // disconnected, need to reconnect
-                    }
+                    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                    if !sinks.lock().await.contains_key(&ws_key) { break; }
                 }
 
-                // Exponential backoff reconnect loop
+                // Reconnect loop with exponential backoff
                 loop {
-                    let _ = event_tx.send((ws_key.clone(), format!("{{\"_internal\":\"reconnecting\",\"wsKey\":\"{}\",\"backoff_ms\":{}}}", ws_key, backoff_ms)));
+                    let _ = event_tx.send((ws_key.clone(), format!(
+                        "{{\"_internal\":\"reconnecting\",\"wsKey\":\"{}\",\"backoff_ms\":{}}}", ws_key, backoff_ms
+                    )));
 
                     tokio::select! {
                         _ = tokio::time::sleep(tokio::time::Duration::from_millis(backoff_ms)) => {}
@@ -157,50 +155,43 @@ impl BaseWebsocketClient {
                     match tokio_tungstenite::connect_async(&url).await {
                         Ok((ws_stream, _)) => {
                             let (sink, stream) = ws_stream.split();
+                            sinks.lock().await.insert(ws_key.clone(), sink);
 
-                            // Restore connection with old topics
-                            let topics = {
-                                // Topics were preserved in the old WsConnection before removal
-                                // We need to get them from somewhere — store them separately
-                                Vec::new() // Will be empty on first reconnect from this path
-                            };
-
-                            conns.lock().await.insert(ws_key.clone(), WsConnection {
-                                sink,
-                                subscribed_topics: topics,
-                            });
-
-                            // Re-auth if private
+                            // Re-auth private
                             if ws_key.contains("Private") {
                                 if let (Some(api_key), Some(api_secret)) = (&config.api_key, &config.api_secret) {
                                     let expires = get_timestamp_ms() + config.recv_window;
-                                    let sign_str = format!("GET/realtime{}", expires);
-                                    if let Ok(signature) = sign_hmac_sha256(api_secret, &sign_str) {
-                                        let auth_msg = serde_json::json!({
-                                            "op": "auth",
-                                            "args": [api_key, expires, signature],
-                                            "req_id": format!("{}-auth", ws_key)
-                                        });
-                                        if let Some(conn) = conns.lock().await.get_mut(&ws_key) {
-                                            let _ = conn.sink.send(Message::Text(auth_msg.to_string().into())).await;
+                                    if let Ok(sig) = sign_hmac_sha256(api_secret, &format!("GET/realtime{}", expires)) {
+                                        let auth = serde_json::json!({"op":"auth","args":[api_key,expires,sig],"req_id":format!("{}-auth",ws_key)});
+                                        if let Some(s) = sinks.lock().await.get_mut(&ws_key) {
+                                            let _ = s.send(Message::Text(auth.to_string().into())).await;
                                         }
                                     }
                                 }
                             }
 
-                            // Spawn stream reader
+                            // Resubscribe from topic state (survives disconnect)
+                            let tracked = topics.lock().await.get(&ws_key).cloned().unwrap_or_default();
+                            if !tracked.is_empty() {
+                                let sub = serde_json::json!({"op":"subscribe","args":tracked,"req_id":tracked.join(",")});
+                                if let Some(s) = sinks.lock().await.get_mut(&ws_key) {
+                                    let _ = s.send(Message::Text(sub.to_string().into())).await;
+                                }
+                            }
+
+                            // Spawn reader for new stream
                             let tx = event_tx.clone();
-                            let conns2 = conns.clone();
-                            let ws_key2 = ws_key.clone();
+                            let sinks2 = sinks.clone();
+                            let wk = ws_key.clone();
                             tokio::spawn(async move {
                                 let mut stream = stream;
                                 while let Some(msg) = stream.next().await {
                                     match msg {
-                                        Ok(Message::Text(text)) => { let _ = tx.send((ws_key2.clone(), text.to_string())); }
-                                        Ok(Message::Ping(_)) => { let _ = tx.send((ws_key2.clone(), r#"{"op":"ping"}"#.to_string())); }
+                                        Ok(Message::Text(text)) => { let _ = tx.send((wk.clone(), text.to_string())); }
+                                        Ok(Message::Ping(_)) => { let _ = tx.send((wk.clone(), r#"{"op":"ping"}"#.to_string())); }
                                         Ok(Message::Close(_)) | Err(_) => {
-                                            let _ = tx.send((ws_key2.clone(), format!("{{\"_internal\":\"disconnected\",\"wsKey\":\"{}\"}}", ws_key2)));
-                                            conns2.lock().await.remove(&ws_key2);
+                                            let _ = tx.send((wk.clone(), format!("{{\"_internal\":\"disconnected\",\"wsKey\":\"{}\"}}", wk)));
+                                            sinks2.lock().await.remove(&wk);
                                             break;
                                         }
                                         _ => {}
@@ -209,27 +200,14 @@ impl BaseWebsocketClient {
                             });
 
                             let _ = event_tx.send((ws_key.clone(), format!("{{\"_internal\":\"reconnected\",\"wsKey\":\"{}\"}}", ws_key)));
-                            backoff_ms = 500; // reset backoff
-                            break; // exit reconnect loop, go back to monitoring
+                            backoff_ms = 500;
+                            break;
                         }
-                        Err(_) => {
-                            backoff_ms = (backoff_ms * 2).min(MAX_BACKOFF_MS);
-                        }
+                        Err(_) => { backoff_ms = (backoff_ms * 2).min(MAX_BACKOFF); }
                     }
                 }
             }
         });
-    }
-
-    fn ws_path(ws_key: &str) -> &str {
-        match ws_key {
-            "v5Private" | "v5PrivateTrade" => "private",
-            "v5SpotPublic" => "public/spot",
-            "v5LinearPublic" => "public/linear",
-            "v5InversePublic" => "public/inverse",
-            "v5OptionPublic" => "public/option",
-            _ => "public/spot",
-        }
     }
 
     async fn authenticate(&self, ws_key: &str) -> ClientResult<()> {
@@ -237,81 +215,60 @@ impl BaseWebsocketClient {
             .ok_or_else(|| ClientError::AuthError("API key required for private WS".into()))?;
         let api_secret = self.config.api_secret.as_ref()
             .ok_or_else(|| ClientError::AuthError("API secret required for private WS".into()))?;
-
         let expires = get_timestamp_ms() + self.config.recv_window;
-        let sign_str = format!("GET/realtime{}", expires);
-        let signature = sign_hmac_sha256(api_secret, &sign_str)
+        let signature = sign_hmac_sha256(api_secret, &format!("GET/realtime{}", expires))
             .map_err(|e| ClientError::AuthError(e))?;
-
-        let auth_msg = serde_json::json!({
-            "op": "auth",
-            "args": [api_key, expires, signature],
-            "req_id": format!("{}-auth", ws_key)
-        });
-
-        self.try_ws_send(ws_key, &auth_msg.to_string())
-    }
-
-    fn send_subscribe(&self, ws_key: &str, topics: &[String]) -> ClientResult<()> {
-        let msg = serde_json::json!({
-            "op": "subscribe",
-            "args": topics,
-            "req_id": topics.join(",")
-        });
+        let msg = serde_json::json!({"op":"auth","args":[api_key,expires,signature],"req_id":format!("{}-auth",ws_key)});
         self.try_ws_send(ws_key, &msg.to_string())
     }
 
-    pub async fn subscribe(&self, topics: Vec<String>) -> ClientResult<()> {
-        if topics.is_empty() { return Ok(()); }
+    fn send_subscribe(&self, ws_key: &str, sub_topics: &[String]) -> ClientResult<()> {
+        let msg = serde_json::json!({"op":"subscribe","args":sub_topics,"req_id":sub_topics.join(",")});
+        self.try_ws_send(ws_key, &msg.to_string())
+    }
 
-        // Find the right connection and track topics
-        let mut conns = self.connections.lock().await;
-        if let Some((key, conn)) = conns.iter_mut().next() {
-            for t in &topics {
-                if !conn.subscribed_topics.contains(t) {
-                    conn.subscribed_topics.push(t.clone());
-                }
+    /// Subscribe to topics — tracked for resubscription on reconnect
+    pub async fn subscribe(&self, new_topics: Vec<String>) -> ClientResult<()> {
+        if new_topics.is_empty() { return Ok(()); }
+
+        // Find the connection to subscribe on
+        let ws_key = {
+            let s = self.sinks.lock().await;
+            match s.keys().next() { Some(k) => k.clone(), None => return Ok(()) }
+        };
+
+        // Track topics (survives disconnect)
+        {
+            let mut t = self.topics.lock().await;
+            let entry = t.entry(ws_key.clone()).or_default();
+            for topic in &new_topics {
+                if !entry.contains(topic) { entry.push(topic.clone()); }
             }
-            let key = key.clone();
-            drop(conns);
-            self.send_subscribe(&key, &topics)?;
         }
-        Ok(())
+
+        self.send_subscribe(&ws_key, &new_topics)
     }
 
     pub fn try_ws_send(&self, ws_key: &str, msg: &str) -> ClientResult<()> {
-        let conns = self.connections.clone();
+        let sinks = self.sinks.clone();
         let key = ws_key.to_string();
         let msg = msg.to_string();
         tokio::spawn(async move {
-            if let Some(conn) = conns.lock().await.get_mut(&key) {
-                let _ = conn.sink.send(Message::Text(msg.into())).await;
+            if let Some(sink) = sinks.lock().await.get_mut(&key) {
+                let _ = sink.send(Message::Text(msg.into())).await;
             }
         });
         Ok(())
     }
 
-    pub async fn send_ws_api_request(
-        &self,
-        ws_key: &str,
-        operation: &str,
-        params: serde_json::Value,
-    ) -> ClientResult<serde_json::Value> {
+    pub async fn send_ws_api_request(&self, ws_key: &str, operation: &str, params: serde_json::Value) -> ClientResult<serde_json::Value> {
         let req_id = format!("{}_{}", operation, get_timestamp_ms());
-        let msg = serde_json::json!({
-            "reqId": req_id,
-            "op": operation,
-            "header": {},
-            "args": [params]
-        });
-
-        let mut conns = self.connections.lock().await;
-        let conn = conns.get_mut(ws_key)
+        let msg = serde_json::json!({"reqId":req_id,"op":operation,"header":{},"args":[params]});
+        let mut sinks = self.sinks.lock().await;
+        let sink = sinks.get_mut(ws_key)
             .ok_or_else(|| ClientError::WebSocketDisconnected { ws_key: ws_key.to_string() })?;
-        conn.sink.send(Message::Text(msg.to_string().into()))
-            .await
+        sink.send(Message::Text(msg.to_string().into())).await
             .map_err(|e| ClientError::WebSocketError(format!("Send failed: {}", e)))?;
-
         Ok(serde_json::json!({"reqId": req_id}))
     }
 
@@ -319,16 +276,12 @@ impl BaseWebsocketClient {
         self.event_rx.lock().await.recv().await
     }
 
-    pub fn config(&self) -> &ClientConfig {
-        &self.config
-    }
+    pub fn config(&self) -> &ClientConfig { &self.config }
 
-    /// Gracefully shut down all connections and reconnect loops
     pub async fn shutdown(&self) {
         self.shutdown.notify_waiters();
-        let mut conns = self.connections.lock().await;
-        for (_, mut conn) in conns.drain() {
-            let _ = conn.sink.close().await;
+        for (_, mut sink) in self.sinks.lock().await.drain() {
+            let _ = sink.close().await;
         }
     }
 }

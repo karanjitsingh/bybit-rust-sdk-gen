@@ -950,7 +950,7 @@ for (const sourceFile of project.getSourceFiles()) {
                 // REST API clients use BaseRestClient
                 clientCode += `// Generated client: ${rustClient.name}\n`;
                 clientCode += `pub struct ${rustClient.structName}<'a> {\n`;
-                clientCode += `    base: &'a BaseRestClient,\n`;
+                clientCode += `    pub base: &'a BaseRestClient,\n`;
                 clientCode += `}\n\n`;
                 clientCode += `impl<'a> ${rustClient.structName}<'a> {\n`;
                 clientCode += `    /// Create a new instance of ${rustClient.structName}\n`;
@@ -961,7 +961,7 @@ for (const sourceFile of project.getSourceFiles()) {
                 // WebSocket clients use BaseWebsocketClient
                 clientCode += `// Generated client: ${rustClient.name}\n`;
                 clientCode += `pub struct ${rustClient.structName}<'a> {\n`;
-                clientCode += `    base: &'a BaseWebsocketClient,\n`;
+                clientCode += `    pub base: &'a BaseWebsocketClient,\n`;
                 clientCode += `}\n\n`;
                 clientCode += `impl<'a> ${rustClient.structName}<'a> {\n`;
                 clientCode += `    /// Create a new instance of ${rustClient.structName}\n`;
