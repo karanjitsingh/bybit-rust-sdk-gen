@@ -27,7 +27,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     base.sync_time().await?;
     println!("Time synced");
 
-    let client = RestClientV5::new(&base);
+    let client = RestClientV5::new(base);
 
     // Get wallet balance
     let balance = client

@@ -602,6 +602,28 @@ export function convertInterface(interfaceName: string, members: StructMember[],
     }
 
     rustCode += `}\n`;
+
+    // Add a convenience ::builder() associated function
+    if (usedGenerics.length > 0) {
+        // In impl blocks, generic params cannot have defaults
+        const implParams = usedGenerics.map(g => {
+            const paramName = g.includes('=') ? g.split('=')[0].trim() : g.trim();
+            return `${paramName}: Default + Clone`;
+        });
+        const paramNames = usedGenerics.map(g => g.includes('=') ? g.split('=')[0].trim() : g.trim());
+        rustCode += `\nimpl<${implParams.join(", ")}> ${interfaceName}<${paramNames.join(", ")}> {\n`;
+        rustCode += `    pub fn builder() -> ${interfaceName}Builder<${paramNames.join(", ")}> {\n`;
+        rustCode += `        ${interfaceName}Builder::default()\n`;
+        rustCode += `    }\n`;
+        rustCode += `}\n`;
+    } else {
+        rustCode += `\nimpl ${interfaceName} {\n`;
+        rustCode += `    pub fn builder() -> ${interfaceName}Builder {\n`;
+        rustCode += `        ${interfaceName}Builder::default()\n`;
+        rustCode += `    }\n`;
+        rustCode += `}\n`;
+    }
+
     return rustCode;
 }
 

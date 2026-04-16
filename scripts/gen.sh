@@ -13,3 +13,7 @@ fi
 if [ -f hand-written/README.md ]; then
   cp hand-written/README.md bybit-rust-sdk/README.md
 fi
+if [ -d hand-written/tests ]; then
+  mkdir -p bybit-rust-sdk/tests
+  cp -r hand-written/tests/* bybit-rust-sdk/tests/
+fi

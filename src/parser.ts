@@ -947,14 +947,14 @@ for (const sourceFile of project.getSourceFiles()) {
                 clientCode += `        Self { ws_client }\n`;
                 clientCode += `    }\n\n`;
             } else if (isRestClient) {
-                // REST API clients use BaseRestClient
+                // REST API clients own BaseRestClient
                 clientCode += `// Generated client: ${rustClient.name}\n`;
-                clientCode += `pub struct ${rustClient.structName}<'a> {\n`;
-                clientCode += `    pub base: &'a BaseRestClient,\n`;
+                clientCode += `pub struct ${rustClient.structName} {\n`;
+                clientCode += `    pub base: BaseRestClient,\n`;
                 clientCode += `}\n\n`;
-                clientCode += `impl<'a> ${rustClient.structName}<'a> {\n`;
+                clientCode += `impl ${rustClient.structName} {\n`;
                 clientCode += `    /// Create a new instance of ${rustClient.structName}\n`;
-                clientCode += `    pub fn new(base: &'a BaseRestClient) -> Self {\n`;
+                clientCode += `    pub fn new(base: BaseRestClient) -> Self {\n`;
                 clientCode += `        Self { base }\n`;
                 clientCode += `    }\n\n`;
             } else {

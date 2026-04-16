@@ -12,7 +12,7 @@ use bybit_rust_sdk::types::shared_v5::CategoryV5;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = ClientConfig::builder().testnet(true).build();
     let base = BaseRestClient::new(config)?;
-    let client = RestClientV5::new(&base);
+    let client = RestClientV5::new(base);
 
     // Get BTC/USDT ticker
     let ticker = client
