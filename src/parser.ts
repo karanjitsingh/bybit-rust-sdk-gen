@@ -899,7 +899,7 @@ const resolvedInlineTypes = inlineTypeRegistry.getAllInlineTypes();
             const matched = overrideMatchedTypes.get(t.typeName) || [];
             lines.push(`### \`${t.typeName}\` ✅ [${ifaceP}, ${fieldP}, ${sigP}] (${matched.length} matches)`, "");
             for (const m of matched) {
-                lines.push(`- ${m.sourceProperty}, ${m.sourceInterface}, ${rustToTs(m.sourceFile || '?')} — ~~\`${m.typeName}\`~~`);
+                lines.push(`- ${m.sourceInterface}.${m.sourceProperty}, ${rustToTs(m.sourceFile || '?')} — ~~\`${m.typeName}\`~~`);
             }
             lines.push("");
         }
@@ -918,7 +918,7 @@ const resolvedInlineTypes = inlineTypeRegistry.getAllInlineTypes();
             for (const [sig, types] of stringSigs) {
                 lines.push(`#### \`${sig}\` (${types.length} definitions)`, "");
                 for (const t of types) {
-                    lines.push(`- ${t.sourceProperty}, ${t.sourceInterface}, ${rustToTs(t.sourceFile || '?')}`);
+                    lines.push(`- ${t.sourceInterface}.${t.sourceProperty}, ${rustToTs(t.sourceFile || '?')} → \`${t.typeName}\``);
                 }
                 lines.push("");
             }
@@ -929,7 +929,7 @@ const resolvedInlineTypes = inlineTypeRegistry.getAllInlineTypes();
             for (const [sig, types] of numberSigs) {
                 lines.push(`#### \`${sig}\` (${types.length} definitions)`, "");
                 for (const t of types) {
-                    lines.push(`- ${t.sourceProperty}, ${t.sourceInterface}, ${rustToTs(t.sourceFile || '?')}`);
+                    lines.push(`- ${t.sourceInterface}.${t.sourceProperty}, ${rustToTs(t.sourceFile || '?')} → \`${t.typeName}\``);
                 }
                 lines.push("");
             }
@@ -940,7 +940,7 @@ const resolvedInlineTypes = inlineTypeRegistry.getAllInlineTypes();
     const uniqueNonOverridden = uniqueTypes.filter(t => !overrideNames.has(t.typeName));
     lines.push(`## Unique inline types (${uniqueNonOverridden.length}, single definition)`, "");
     for (const t of uniqueNonOverridden) {
-        lines.push(`- \`${t.signature}\` → \`${t.typeName}\` — ${t.sourceProperty}, ${t.sourceInterface}, ${rustToTs(t.sourceFile || '?')}`);
+        lines.push(`- \`${t.signature}\` → \`${t.typeName}\` — ${t.sourceInterface}.${t.sourceProperty}, ${rustToTs(t.sourceFile || '?')}`);
     }
 
     const reportPath = path.join(path.dirname(GEN_DIR), "..", "reports", "inline-type-report.md");
