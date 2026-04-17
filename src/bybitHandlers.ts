@@ -13,6 +13,12 @@ import { convertTypeAlias, convertInterface } from "./codeGenerator";
 import { TypeConverter } from "./typeConverter";
 import { RustType } from "./types";
 
+function toBybitSourcePath(relativePath: string): string {
+    const normalized = relativePath.replace(/\\/g, "/").replace(/^\.?\//, "");
+    const withoutSrcPrefix = normalized.startsWith("src/") ? normalized.slice(4) : normalized;
+    return `bybit-api/src/${withoutSrcPrefix}`;
+}
+
 /**
  * Check if a TypeScript interface should be skipped (not generated in Rust)
  * 
@@ -96,7 +102,7 @@ export function extractClientTypes(
                         name: typeName,
                         content: result.code,
                         category: "type_alias",
-                        sourceFile: relativePath,
+                        sourceFile: toBybitSourcePath(relativePath),
                     });
                     // Register in type registry
                     typeRegistry.registerType(typeName, outputFilePath);
@@ -105,7 +111,7 @@ export function extractClientTypes(
                         name: typeName,
                         content: `// Type alias '${typeName}' skipped: ${result.skipReason}\n`,
                         category: "skipped",
-                        sourceFile: relativePath,
+                        sourceFile: toBybitSourcePath(relativePath),
                         skipReason: result.skipReason
                     });
                 }
@@ -149,7 +155,7 @@ export function extractClientTypes(
                         name: interfaceName,
                         content: rustCode,
                         category: "struct",
-                        sourceFile: relativePath,
+                        sourceFile: toBybitSourcePath(relativePath),
                     });
                     // Register in type registry
                     typeRegistry.registerType(interfaceName, outputFilePath);

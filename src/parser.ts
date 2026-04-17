@@ -23,6 +23,10 @@ import { BybitClientHandlers } from "./bybitClientHandlers";
 const BYBIT_API_DIR = path.join(__dirname, "../bybit-api");
 const GEN_DIR = path.join(__dirname, "../bybit-rust-sdk/src");
 
+function toBybitSourcePath(relativePath: string): string {
+    return `bybit-api/src/${relativePath.replace(/\\/g, "/")}`;
+}
+
 // Create output directory if it doesn't exist
 if (!fs.existsSync(GEN_DIR)) {
     fs.mkdirSync(GEN_DIR, { recursive: true });
@@ -192,7 +196,7 @@ project.getSourceFiles().forEach(sourceFile => {
                         name: typeName,
                         content: result.code,
                         category: category as any,
-                        sourceFile: relativePath
+                        sourceFile: toBybitSourcePath(relativePath)
                     }, relativePath);
 
                     // Track type dependencies from generated code (especially for type aliases
@@ -216,7 +220,7 @@ project.getSourceFiles().forEach(sourceFile => {
                         name: typeName,
                         content: `// Type alias '${typeName}' skipped: ${commentText}\n`,
                         category: "skipped",
-                        sourceFile: relativePath,
+                        sourceFile: toBybitSourcePath(relativePath),
                         skipReason: result.skipReason
                     }, relativePath);
                 }
@@ -252,7 +256,7 @@ project.getSourceFiles().forEach(sourceFile => {
                 name: interfaceName,
                 content: `// Interface '${interfaceName}' skipped: ${skipCheck.reason}\n`,
                 category: "skipped",
-                sourceFile: relativePath,
+                sourceFile: toBybitSourcePath(relativePath),
                 skipReason: skipCheck.reason
             }, relativePath);
             return;
@@ -469,7 +473,7 @@ project.getSourceFiles().forEach(sourceFile => {
                     name: interfaceName,
                     content: rustCode,
                     category: "struct",
-                    sourceFile: relativePath
+                    sourceFile: toBybitSourcePath(relativePath)
                 }, relativePath);
                 console.success(`  ✓ Interface: ${interfaceName}${isGeneric ? ' (generic)' : ''}`);
             }
@@ -504,7 +508,7 @@ project.getSourceFiles().forEach(sourceFile => {
                 name: enumName,
                 content: rustCode,
                 category: "enum",
-                sourceFile: relativePath
+                sourceFile: toBybitSourcePath(relativePath)
             }, relativePath);
             console.success(`  ✓ Enum: ${enumName}`);
         } catch (error) {
@@ -541,7 +545,7 @@ project.getSourceFiles().forEach(sourceFile => {
                         name: typeName,
                         content: rustCode,
                         category: "struct",
-                        sourceFile: relativePath
+                        sourceFile: toBybitSourcePath(relativePath)
                     }, relativePath);
                     console.debug(`  → Generated inline object struct: ${typeName}`);
                 }
@@ -737,7 +741,7 @@ for (const sourceFile of utilFiles) {
             const jsDocs = interfaceDecl.getJsDocs();
             const rustCode = convertInterface(interfaceName, members, generics, jsDocs);
             if (rustCode) {
-                utilTypes.push({ name: interfaceName, content: rustCode, category: "struct", sourceFile: relativePath });
+                utilTypes.push({ name: interfaceName, content: rustCode, category: "struct", sourceFile: toBybitSourcePath(relativePath) });
                 typeRegistry.registerType(interfaceName, utilModulePath);
                 console.success(`  ✓ Interface: ${interfaceName}`);
             }
@@ -754,11 +758,11 @@ for (const sourceFile of utilFiles) {
             const jsDocs = typeAlias.getJsDocs();
             const result = convertTypeAlias(typeName, typeNode, jsDocs, relativePath);
             if (result.code) {
-                utilTypes.push({ name: typeName, content: result.code, category: "type_alias", sourceFile: relativePath });
+                utilTypes.push({ name: typeName, content: result.code, category: "type_alias", sourceFile: toBybitSourcePath(relativePath) });
                 typeRegistry.registerType(typeName, utilModulePath);
                 console.success(`  ✓ Type alias: ${typeName}`);
             } else if (result.skipReason) {
-                utilTypes.push({ name: typeName, content: `// Type alias '${typeName}' skipped: ${result.skipReason}\n`, category: "skipped", sourceFile: relativePath, skipReason: result.skipReason });
+                utilTypes.push({ name: typeName, content: `// Type alias '${typeName}' skipped: ${result.skipReason}\n`, category: "skipped", sourceFile: toBybitSourcePath(relativePath), skipReason: result.skipReason });
             }
         }
     }
@@ -872,6 +876,7 @@ directories.add("client");
 
 for (const sourceFile of project.getSourceFiles()) {
     const filePath = sourceFile.getFilePath();
+    const sourcePathRelativeToBybitSrc = path.relative(path.join(BYBIT_API_DIR, "src"), filePath);
     
     // Skip node_modules and test files
     if (filePath.includes("node_modules") || filePath.includes(".test.") || filePath.includes(".spec.")) {
@@ -1008,7 +1013,7 @@ for (const sourceFile of project.getSourceFiles()) {
                 name: rustClient.structName,
                 content: clientCode,
                 category: "struct",
-                sourceFile: filePath,
+                sourceFile: toBybitSourcePath(sourcePathRelativeToBybitSrc),
             });
             
             console.success(`  ✓ ${rustClient.name} -> ${clientFilePath}`);

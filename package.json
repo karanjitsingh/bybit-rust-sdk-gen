@@ -4,7 +4,7 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "tsc",
+    "build": "npx tsc",
     "gen:rust": "bash scripts/post-gen-rust.sh",
     "gen": "bash scripts/gen.sh && npm run gen:rust",
     "run": "npm run build && npm run start"

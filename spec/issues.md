@@ -15,7 +15,6 @@ regeneration is always clean.
 ```
 hand-written/
   Cargo.toml
-  Cargo.lock
   rustfmt.toml
   src/client/
     BaseRestClient.rs
@@ -25,6 +24,7 @@ hand-written/
 ```
 
 The `gen` script in `package.json` runs: `node bin/parser.js && cp -r hand-written/...`
+for source/config files. `Cargo.lock` is not copied from `hand-written/`.
 
 ---
 

@@ -9,3 +9,4 @@ target
 bin/
 bybit-api/
 node_modules/
+hand-written/Cargo.lock
