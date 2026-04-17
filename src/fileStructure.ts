@@ -16,6 +16,7 @@ export class FileStructure {
     public mainContent: RustType[];
     public skippedTypes: RustType[];
     public typeAliases: Array<{ alias: string; canonical: string }>;
+    public typeRenames: Map<string, string> = new Map();
 
     constructor(filePath: string) {
         this.filePath = filePath;
@@ -43,6 +44,13 @@ export class FileStructure {
         }
 
         let fileContent = this.generateContent(registry);
+
+        // Apply type renames (per-struct → shared), longest first to avoid substring matches
+        const sortedRenames = [...this.typeRenames.entries()].sort((a, b) => b[0].length - a[0].length);
+        for (const [oldName, newName] of sortedRenames) {
+            fileContent = fileContent.replace(new RegExp(`\\b${oldName}\\b`, 'g'), newName);
+        }
+
         fs.writeFileSync(outputPath, fileContent);
     }
 

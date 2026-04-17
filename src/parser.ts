@@ -779,53 +779,138 @@ if (utilTypes.length > 0) {
 const inlineTypes = inlineTypeRegistry.getAllInlineTypes();
 const inlineTypesByFile = new Map<string, typeof inlineTypes>();
 
-// Generate inline type sharing report
+// Load shared type overrides
+const sharedTypesPath = path.join(path.dirname(GEN_DIR), "..", "shared-types.json");
+const sharedTypeOverrides: Record<string, string> = fs.existsSync(sharedTypesPath)
+    ? JSON.parse(fs.readFileSync(sharedTypesPath, "utf8"))
+    : {};
+const overrideCount = Object.keys(sharedTypeOverrides).length;
+if (overrideCount > 0) {
+    console.info(`\nLoaded ${overrideCount} shared type overrides from shared-types.json`);
+}
+
+// Apply overrides: promote matching signatures to shared types
+// Renames: old per-struct name → shared name (applied at write time)
+const typeRenames = new Map<string, string>();
+{
+    // Group inline types by signature
+    const bySignature = new Map<string, typeof inlineTypes>();
+    for (const t of inlineTypes) {
+        if (!bySignature.has(t.signature)) bySignature.set(t.signature, []);
+        bySignature.get(t.signature)!.push(t);
+    }
+
+    for (const [sig, sharedName] of Object.entries(sharedTypeOverrides)) {
+        const types = bySignature.get(sig);
+        if (!types || types.length === 0) {
+            console.warn(`  ⚠️  Override "${sig}" → "${sharedName}" matches no inline types`);
+            continue;
+        }
+
+        console.info(`  → Override: "${sig}" → ${sharedName} (${types.length} types)`);
+
+        // Collect all source files
+        const allFiles = new Set<string>();
+        for (const t of types) {
+            if (t.sourceFile) allFiles.add(t.sourceFile);
+        }
+
+        // Create the shared type (based on first type's data)
+        const first = types[0];
+        const sharedType: typeof inlineTypes[0] = {
+            ...first,
+            typeName: sharedName,
+            signature: sig,
+            sourceFile: "types/shared.rs",
+            usedInFiles: allFiles,
+        };
+
+        // Remove per-struct entries, record renames
+        for (const t of types) {
+            inlineTypeRegistry.removeType(t.typeName);
+            typeRenames.set(t.typeName, sharedName);
+        }
+
+        // Add the shared type
+        inlineTypeRegistry.addType(sharedType);
+    }
+}
+
+// Re-fetch after overrides
+const resolvedInlineTypes = inlineTypeRegistry.getAllInlineTypes();
+
+// Generate inline type report
 {
     const lines: string[] = ["# Inline Type Report", ""];
 
-    // Split into shared (multiple definitions) vs unique (single definition)
-    const shared: typeof inlineTypes = [];
-    const unique: typeof inlineTypes = [];
+    const shared = resolvedInlineTypes.filter(t => t.references.length > 1)
+        .sort((a, b) => b.references.length - a.references.length);
+    const unique = resolvedInlineTypes.filter(t => t.references.length <= 1);
 
-    for (const t of inlineTypes) {
-        if (t.references.length > 1) {
-            shared.push(t);
-        } else {
-            unique.push(t);
+    // Overridden types
+    const overridden = shared.filter(t => Object.values(sharedTypeOverrides).includes(t.typeName));
+    const notOverridden = shared.filter(t => !Object.values(sharedTypeOverrides).includes(t.typeName));
+
+    if (overridden.length > 0) {
+        lines.push(`## Overridden shared types (${overridden.length})`, "");
+        for (const t of overridden) {
+            lines.push(`### \`${t.signature}\` → \`${t.typeName}\` ✅ (${t.references.length} definitions)`, "");
+            for (const ref of t.references) {
+                const perStruct = `${ref.sourceInterface}_${ref.sourceProperty.charAt(0).toUpperCase() + ref.sourceProperty.slice(1)}`;
+                lines.push(`- ${ref.sourceProperty}, ${ref.sourceInterface}, ${ref.sourceFile} — ~~\`${perStruct}\`~~`);
+            }
+            lines.push("");
         }
     }
 
-    shared.sort((a, b) => b.references.length - a.references.length);
-
-    lines.push(`## Shared inline types (${shared.length} types, defined in multiple places)`, "");
-    for (const t of shared) {
-        const sig = t.variants.map(v => `'${v}'`).join(" | ");
-        lines.push(`### \`${sig}\` (${t.references.length} definitions)`, "");
-        for (const ref of t.references) {
-            lines.push(`- ${ref.sourceProperty}, ${ref.sourceInterface}, ${ref.sourceFile} → \`${ref.sourceInterface}_${ref.sourceProperty.charAt(0).toUpperCase() + ref.sourceProperty.slice(1)}\``);
+    if (notOverridden.length > 0) {
+        lines.push(`## Shared signatures without overrides (${notOverridden.length}, candidates for shared-types.json)`, "");
+        for (const t of notOverridden) {
+            lines.push(`### \`${t.signature}\` (${t.references.length} definitions)`, "");
+            for (const ref of t.references) {
+                lines.push(`- ${ref.sourceProperty}, ${ref.sourceInterface}, ${ref.sourceFile}`);
+            }
+            lines.push("");
         }
-        lines.push("");
     }
 
     lines.push(`## Unique inline types (${unique.length}, single definition)`, "");
     for (const t of unique) {
-        const sig = t.variants.map(v => `'${v}'`).join(" | ");
         const ref = t.references[0];
-        lines.push(`- \`${sig}\` → ${ref.sourceProperty}, ${ref.sourceInterface}, ${ref.sourceFile} → \`${t.typeName}\``);
+        lines.push(`- \`${t.signature}\` → \`${t.typeName}\` — ${ref.sourceProperty}, ${ref.sourceInterface}, ${ref.sourceFile}`);
     }
 
     const reportPath = path.join(path.dirname(GEN_DIR), "..", "reports", "inline-type-report.md");
     fs.mkdirSync(path.dirname(reportPath), { recursive: true });
     fs.writeFileSync(reportPath, lines.join("\n"));
     console.info(`\nInline type report: ${reportPath}`);
-    console.info(`  ${shared.length} shared, ${unique.length} unique`);
+    console.info(`  ${overridden.length} overridden, ${notOverridden.length} candidates, ${unique.length} unique`);
 }
 
-if (inlineTypes.length > 0) {
-    console.info(`\nRegistering ${inlineTypes.length} inline types...`);
+if (resolvedInlineTypes.length > 0) {
+    console.info(`\nRegistering ${resolvedInlineTypes.length} inline types...`);
+
+    // Set renames on all file structures — applied at write time
+    if (typeRenames.size > 0) {
+        for (const [, fileStructure] of fileStructures.entries()) {
+            for (const [oldName, newName] of typeRenames) {
+                fileStructure.typeRenames.set(oldName, newName);
+            }
+        }
+        // Update type dependencies
+        for (const [oldName, newName] of typeRenames) {
+            for (const [filePath,] of fileStructures.entries()) {
+                const deps = typeRegistry.getFileDependencies(filePath);
+                if (deps && deps.has(oldName)) {
+                    deps.delete(oldName);
+                    deps.add(newName);
+                }
+            }
+        }
+    }
 
     // First pass: group by file
-    for (const inlineType of inlineTypes) {
+    for (const inlineType of resolvedInlineTypes) {
         const targetFile = inlineType.sourceFile || "types/shared.rs"; // fallback
         
         if (!inlineTypesByFile.has(targetFile)) {

@@ -14,6 +14,7 @@ export interface InlineTypeReference {
 
 export interface InlineTypeInfo {
     typeName: string;
+    signature: string;          // Type-aware key: "'Buy' | 'Sell'" or "0 | 1"
     variants: string[];
     isHeterogeneous?: boolean;  // For unions like string | number | CustomType
     genericParams?: string[];   // For generic inline types like T | string | number
@@ -94,25 +95,33 @@ export class InlineTypeRegistry {
         }
 
         // Create a signature for this type (include all types for uniqueness)
+        // signatureParts preserve type info: string literals quoted, numbers unquoted
+        const signatureParts: string[] = [];
         const variants = nonNullTypes.map(t => {
-            // For string/number literals, get the literal value
             if (t.isStringLiteral()) {
-                return t.getLiteralValue() as string;
+                const val = t.getLiteralValue() as string;
+                signatureParts.push(`'${val}'`);
+                return val;
             }
             if (t.isNumberLiteral()) {
-                return String(t.getLiteralValue());
+                const val = String(t.getLiteralValue());
+                signatureParts.push(val);
+                return val;
             }
-            // For enum literals, try to extract the enum member name
             if (t.isEnumLiteral()) {
                 const symbol = t.getSymbol();
                 if (symbol) {
-                    return symbol.getName();
+                    const name = symbol.getName();
+                    signatureParts.push(name);
+                    return name;
                 }
             }
-            // For other types, use getText() and strip quotes
-            return t.getText().replace(/['"]/g, "");
+            const text = t.getText().replace(/['"]/g, "");
+            signatureParts.push(text);
+            return text;
         }).sort();
-        const signature = variants.join("|");
+        signatureParts.sort();
+        const signature = signatureParts.join(" | ");
 
         // Track references on the first registered type for reporting
         if (this.typeSignatureToName.has(signature)) {
@@ -139,6 +148,7 @@ export class InlineTypeRegistry {
         const usedInFiles = sourceFile ? new Set([sourceFile]) : undefined;
         this.inlineTypes.set(typeName, {
             typeName,
+            signature,
             variants,
             isHeterogeneous,
             genericParams: genericParams.length > 0 ? genericParams : undefined,
@@ -263,6 +273,14 @@ export class InlineTypeRegistry {
      */
     getTypeName(signature: string): string | undefined {
         return this.typeSignatureToName.get(signature);
+    }
+
+    removeType(typeName: string): void {
+        this.inlineTypes.delete(typeName);
+    }
+
+    addType(info: InlineTypeInfo): void {
+        this.inlineTypes.set(info.typeName, info);
     }
 }
 
