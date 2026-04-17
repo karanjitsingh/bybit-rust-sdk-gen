@@ -779,6 +779,48 @@ if (utilTypes.length > 0) {
 const inlineTypes = inlineTypeRegistry.getAllInlineTypes();
 const inlineTypesByFile = new Map<string, typeof inlineTypes>();
 
+// Generate inline type sharing report
+{
+    const lines: string[] = ["# Inline Type Report", ""];
+
+    // Split into shared (multiple definitions) vs unique (single definition)
+    const shared: typeof inlineTypes = [];
+    const unique: typeof inlineTypes = [];
+
+    for (const t of inlineTypes) {
+        if (t.references.length > 1) {
+            shared.push(t);
+        } else {
+            unique.push(t);
+        }
+    }
+
+    shared.sort((a, b) => b.references.length - a.references.length);
+
+    lines.push(`## Shared inline types (${shared.length} types, defined in multiple places)`, "");
+    for (const t of shared) {
+        const sig = t.variants.map(v => `'${v}'`).join(" | ");
+        lines.push(`### \`${sig}\` (${t.references.length} definitions)`, "");
+        for (const ref of t.references) {
+            lines.push(`- ${ref.sourceProperty}, ${ref.sourceInterface}, ${ref.sourceFile} → \`${ref.sourceInterface}_${ref.sourceProperty.charAt(0).toUpperCase() + ref.sourceProperty.slice(1)}\``);
+        }
+        lines.push("");
+    }
+
+    lines.push(`## Unique inline types (${unique.length}, single definition)`, "");
+    for (const t of unique) {
+        const sig = t.variants.map(v => `'${v}'`).join(" | ");
+        const ref = t.references[0];
+        lines.push(`- \`${sig}\` → ${ref.sourceProperty}, ${ref.sourceInterface}, ${ref.sourceFile} → \`${t.typeName}\``);
+    }
+
+    const reportPath = path.join(path.dirname(GEN_DIR), "..", "reports", "inline-type-report.md");
+    fs.mkdirSync(path.dirname(reportPath), { recursive: true });
+    fs.writeFileSync(reportPath, lines.join("\n"));
+    console.info(`\nInline type report: ${reportPath}`);
+    console.info(`  ${shared.length} shared, ${unique.length} unique`);
+}
+
 if (inlineTypes.length > 0) {
     console.info(`\nRegistering ${inlineTypes.length} inline types...`);
 
@@ -792,8 +834,8 @@ if (inlineTypes.length > 0) {
         inlineTypesByFile.get(targetFile)!.push(inlineType);
     }
 
-    // EXTRACT COMMON TYPES FIRST (before cross-file consolidation)
-    extractCommonInlineTypesEarly(inlineTypes, inlineTypesByFile);
+    // Per-struct inline types: each struct gets its own enum, no common extraction needed
+    // extractCommonInlineTypesEarly(inlineTypes, inlineTypesByFile);
 
     // Second pass: detect inline types used across multiple files and move them to shared.rs
     const sharedInlineTypes: typeof inlineTypes = [];

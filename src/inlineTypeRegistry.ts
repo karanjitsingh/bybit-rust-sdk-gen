@@ -6,6 +6,12 @@
 import { Type, Node } from "ts-morph";
 import { makeValidRustIdent } from "./utils";
 
+export interface InlineTypeReference {
+    sourceInterface: string;
+    sourceProperty: string;
+    sourceFile: string;
+}
+
 export interface InlineTypeInfo {
     typeName: string;
     variants: string[];
@@ -15,11 +21,14 @@ export interface InlineTypeInfo {
     sourceProperty?: string;    // The property name that required this inline type
     sourceFile?: string;        // The Rust file where this type should be generated (first occurrence)
     usedInFiles?: Set<string>;  // All Rust files that use this inline type
+    references: InlineTypeReference[];  // All definition sites
 }
 
 export class InlineTypeRegistry {
     private typeSignatureToName: Map<string, string> = new Map();
     private inlineTypes: Map<string, InlineTypeInfo> = new Map();
+    // Maps alias name -> canonical name
+    private typeAliases: Map<string, string> = new Map();
     private typeCounter = 0;
 
     /**
@@ -105,30 +114,26 @@ export class InlineTypeRegistry {
         }).sort();
         const signature = variants.join("|");
 
-        // Return existing name if already registered
+        // Track references on the first registered type for reporting
         if (this.typeSignatureToName.has(signature)) {
-            const existingTypeName = this.typeSignatureToName.get(signature)!;
-            // Track that this type is also used in the current file
-            if (sourceFile) {
-                const existingType = this.inlineTypes.get(existingTypeName);
-                if (existingType) {
-                    if (!existingType.usedInFiles) {
-                        existingType.usedInFiles = new Set();
-                        // Add the original source file
-                        if (existingType.sourceFile) {
-                            existingType.usedInFiles.add(existingType.sourceFile);
-                        }
-                    }
-                    existingType.usedInFiles.add(sourceFile);
-                }
+            const firstTypeName = this.typeSignatureToName.get(signature)!;
+            const firstType = this.inlineTypes.get(firstTypeName);
+            if (firstType) {
+                firstType.references.push({
+                    sourceInterface: sourceInterface || "?",
+                    sourceProperty: context || "?",
+                    sourceFile: sourceFile || "?",
+                });
             }
-            return existingTypeName;
         }
 
-        // Generate a new type name based on context and variants
+        // Always generate a new per-struct type name
         const typeName = this.generateTypeName(context, variants, sourceInterface);
 
-        this.typeSignatureToName.set(signature, typeName);
+        // Only track the first type for a signature (for reporting)
+        if (!this.typeSignatureToName.has(signature)) {
+            this.typeSignatureToName.set(signature, typeName);
+        }
 
         // Store the type info (we'll generate it later)
         const usedInFiles = sourceFile ? new Set([sourceFile]) : undefined;
@@ -140,7 +145,12 @@ export class InlineTypeRegistry {
             sourceInterface,
             sourceProperty: context,
             sourceFile,
-            usedInFiles
+            usedInFiles,
+            references: [{
+                sourceInterface: sourceInterface || "?",
+                sourceProperty: context || "?",
+                sourceFile: sourceFile || "?",
+            }],
         });
 
         return typeName;
@@ -223,7 +233,8 @@ export class InlineTypeRegistry {
     }
 
     private isDuplicateName(name: string): boolean {
-        return Array.from(this.inlineTypes.values()).some(t => t.typeName === name);
+        return Array.from(this.inlineTypes.values()).some(t => t.typeName === name)
+            || this.typeAliases.has(name);
     }
 
     /**
@@ -231,6 +242,13 @@ export class InlineTypeRegistry {
      */
     getAllInlineTypes(): InlineTypeInfo[] {
         return Array.from(this.inlineTypes.values());
+    }
+
+    /**
+     * Get all type aliases: alias name -> canonical name
+     */
+    getTypeAliases(): Map<string, string> {
+        return this.typeAliases;
     }
 
     /**

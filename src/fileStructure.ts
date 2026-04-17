@@ -15,6 +15,7 @@ export class FileStructure {
     public inlineTypes: InlineTypeInfo[];
     public mainContent: RustType[];
     public skippedTypes: RustType[];
+    public typeAliases: Array<{ alias: string; canonical: string }>;
 
     constructor(filePath: string) {
         this.filePath = filePath;
@@ -22,6 +23,11 @@ export class FileStructure {
         this.inlineTypes = [];
         this.mainContent = [];
         this.skippedTypes = [];
+        this.typeAliases = [];
+    }
+
+    addTypeAlias(aliasName: string, canonicalName: string): void {
+        this.typeAliases.push({ alias: aliasName, canonical: canonicalName });
     }
 
     /**
@@ -397,6 +403,7 @@ export class FileStructure {
             }
         }
 
+        // Emit type aliases
         content += `}\n`;
 
         return content;

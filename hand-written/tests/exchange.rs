@@ -3,7 +3,7 @@ use bybit_rust_sdk::client::RestClientV5::RestClientV5;
 use bybit_rust_sdk::client::config::ClientConfig;
 use bybit_rust_sdk::types::request::v5_market::GetKlineParamsV5;
 use bybit_rust_sdk::types::shared::KlineIntervalV3;
-use bybit_rust_sdk::types::shared::inline::GetAccountInstrumentsInfoParamsV5_Category;
+use bybit_rust_sdk::types::request::v5_market::inline::GetKlineParamsV5_Category;
 
 /// Wrapper struct that owns a RestClientV5, demonstrating
 /// that the client can now be stored in a struct without lifetime issues.
@@ -25,7 +25,7 @@ impl Exchange {
         interval: KlineIntervalV3,
     ) -> Result<serde_json::Value, bybit_rust_sdk::client::ClientError> {
         let params = GetKlineParamsV5::builder()
-            .category(GetAccountInstrumentsInfoParamsV5_Category::spot)
+            .category(GetKlineParamsV5_Category::spot)
             .symbol(symbol)
             .interval(interval)
             .limit(5.0)
