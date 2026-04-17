@@ -841,50 +841,79 @@ const resolvedInlineTypes = inlineTypeRegistry.getAllInlineTypes();
 
 // Generate inline type report
 {
+    const rustToTs = (p: string) => p.replace(/\.rs$/, ".ts").replace(/_/g, "-");
     const lines: string[] = ["# Inline Type Report", ""];
 
-    const shared = resolvedInlineTypes.filter(t => t.references.length > 1)
-        .sort((a, b) => b.references.length - a.references.length);
-    const unique = resolvedInlineTypes.filter(t => t.references.length <= 1);
+    // Group by signature to find shared vs unique
+    const bySignature = new Map<string, typeof resolvedInlineTypes>();
+    for (const t of resolvedInlineTypes) {
+        if (!bySignature.has(t.signature)) bySignature.set(t.signature, []);
+        bySignature.get(t.signature)!.push(t);
+    }
 
-    // Overridden types
-    const overridden = shared.filter(t => Object.values(sharedTypeOverrides).includes(t.typeName));
-    const notOverridden = shared.filter(t => !Object.values(sharedTypeOverrides).includes(t.typeName));
+    const sharedSigs = [...bySignature.entries()].filter(([, types]) => types.length > 1)
+        .sort((a, b) => b[1].length - a[1].length);
+    const uniqueTypes = [...bySignature.entries()].filter(([, types]) => types.length === 1)
+        .map(([, types]) => types[0]);
 
-    if (overridden.length > 0) {
-        lines.push(`## Overridden shared types (${overridden.length})`, "");
-        for (const t of overridden) {
-            lines.push(`### \`${t.signature}\` → \`${t.typeName}\` ✅ (${t.references.length} definitions)`, "");
-            for (const ref of t.references) {
-                const perStruct = `${ref.sourceInterface}_${ref.sourceProperty.charAt(0).toUpperCase() + ref.sourceProperty.slice(1)}`;
-                lines.push(`- ${ref.sourceProperty}, ${ref.sourceInterface}, ${ref.sourceFile} — ~~\`${perStruct}\`~~`);
+    // Overridden signatures
+    const overriddenSigs = sharedSigs.filter(([sig]) => sig in sharedTypeOverrides);
+    const candidateSigs = sharedSigs.filter(([sig]) => !(sig in sharedTypeOverrides));
+
+    if (overriddenSigs.length > 0) {
+        lines.push(`## Overridden shared types (${overriddenSigs.length})`, "");
+        for (const [sig, types] of overriddenSigs) {
+            const sharedName = sharedTypeOverrides[sig];
+            lines.push(`### \`${sig}\` → \`${sharedName}\` ✅ (${types.length} definitions)`, "");
+            for (const t of types) {
+                lines.push(`- ${t.sourceProperty}, ${t.sourceInterface}, ${rustToTs(t.sourceFile || '?')} — ~~\`${t.typeName}\`~~`);
             }
             lines.push("");
         }
     }
 
-    if (notOverridden.length > 0) {
-        lines.push(`## Shared signatures without overrides (${notOverridden.length}, candidates for shared-types.json)`, "");
-        for (const t of notOverridden) {
-            lines.push(`### \`${t.signature}\` (${t.references.length} definitions)`, "");
-            for (const ref of t.references) {
-                lines.push(`- ${ref.sourceProperty}, ${ref.sourceInterface}, ${ref.sourceFile}`);
+    if (candidateSigs.length > 0) {
+        // Split into string literal and number literal, sort each alphabetically
+        const isNumericSig = (sig: string) => !sig.includes("'");
+        const stringSigs = candidateSigs.filter(([sig]) => !isNumericSig(sig)).sort((a, b) => a[0].localeCompare(b[0]));
+        const numberSigs = candidateSigs.filter(([sig]) => isNumericSig(sig)).sort((a, b) => a[0].localeCompare(b[0]));
+
+        lines.push(`## Shared signatures without overrides (${candidateSigs.length}, candidates for shared-types.json)`, "");
+
+        if (stringSigs.length > 0) {
+            lines.push(`### String literals`, "");
+            for (const [sig, types] of stringSigs) {
+                lines.push(`#### \`${sig}\` (${types.length} definitions)`, "");
+                for (const t of types) {
+                    lines.push(`- ${t.sourceProperty}, ${t.sourceInterface}, ${rustToTs(t.sourceFile || '?')}`);
+                }
+                lines.push("");
             }
-            lines.push("");
+        }
+
+        if (numberSigs.length > 0) {
+            lines.push(`### Number literals`, "");
+            for (const [sig, types] of numberSigs) {
+                lines.push(`#### \`${sig}\` (${types.length} definitions)`, "");
+                for (const t of types) {
+                    lines.push(`- ${t.sourceProperty}, ${t.sourceInterface}, ${rustToTs(t.sourceFile || '?')}`);
+                }
+                lines.push("");
+            }
         }
     }
 
-    lines.push(`## Unique inline types (${unique.length}, single definition)`, "");
-    for (const t of unique) {
-        const ref = t.references[0];
-        lines.push(`- \`${t.signature}\` → \`${t.typeName}\` — ${ref.sourceProperty}, ${ref.sourceInterface}, ${ref.sourceFile}`);
+    uniqueTypes.sort((a, b) => a.signature.localeCompare(b.signature));
+    lines.push(`## Unique inline types (${uniqueTypes.length}, single definition)`, "");
+    for (const t of uniqueTypes) {
+        lines.push(`- \`${t.signature}\` → \`${t.typeName}\` — ${t.sourceProperty}, ${t.sourceInterface}, ${rustToTs(t.sourceFile || '?')}`);
     }
 
     const reportPath = path.join(path.dirname(GEN_DIR), "..", "reports", "inline-type-report.md");
     fs.mkdirSync(path.dirname(reportPath), { recursive: true });
     fs.writeFileSync(reportPath, lines.join("\n"));
     console.info(`\nInline type report: ${reportPath}`);
-    console.info(`  ${overridden.length} overridden, ${notOverridden.length} candidates, ${unique.length} unique`);
+    console.info(`  ${overriddenSigs.length} overridden, ${candidateSigs.length} candidates, ${uniqueTypes.length} unique`);
 }
 
 if (resolvedInlineTypes.length > 0) {
