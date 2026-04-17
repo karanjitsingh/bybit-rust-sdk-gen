@@ -790,14 +790,16 @@ if (overrideCount > 0) {
 }
 
 // Glob-style matching: * matches any substring
-function globMatch(pattern: string, value: string): boolean {
-    const regex = new RegExp('^' + pattern.split('*').map(s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('.*') + '$', 'i');
+function globMatch(pattern: string, value: string, caseInsensitive: boolean = false): boolean {
+    const flags = caseInsensitive ? 'i' : '';
+    const regex = new RegExp('^' + pattern.split('*').map(s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('.*') + '$', flags);
     return regex.test(value);
 }
 
 // Apply overrides: promote matching types to shared
 const typeRenames = new Map<string, string>();
 const overrideMatches = new Map<string, number>(); // track match count per override
+const overrideMatchedTypes = new Map<string, typeof inlineTypes>(); // track matched types for report
 {
     for (const sharedName of Object.keys(sharedTypeOverrides)) {
         overrideMatches.set(sharedName, 0);
@@ -808,8 +810,8 @@ const overrideMatches = new Map<string, number>(); // track match count per over
 
         for (const t of inlineTypes) {
             if (globMatch(sigPattern, t.signature)
-                && globMatch(ifacePattern, t.sourceInterface || '')
-                && globMatch(fieldPattern, t.sourceProperty || '')) {
+                && globMatch(ifacePattern, t.sourceInterface || '', true)
+                && globMatch(fieldPattern, t.sourceProperty || '', true)) {
                 matched.push(t);
             }
         }
@@ -817,6 +819,8 @@ const overrideMatches = new Map<string, number>(); // track match count per over
         overrideMatches.set(sharedName, matched.length);
 
         if (matched.length === 0) continue;
+
+        overrideMatchedTypes.set(sharedName, [...matched]);
 
         console.info(`  → Override: ${sharedName} (${matched.length} matches)`);
 
@@ -892,10 +896,12 @@ const resolvedInlineTypes = inlineTypeRegistry.getAllInlineTypes();
         lines.push(`## Overridden shared types (${overriddenTypes.length})`, "");
         for (const t of overriddenTypes) {
             const [ifaceP, fieldP, sigP] = sharedTypeOverrides[t.typeName];
-            const matchCount = typeRenames.size > 0
-                ? [...typeRenames.values()].filter(v => v === t.typeName).length
-                : 0;
-            lines.push(`### \`${t.typeName}\` ✅ [${ifaceP}, ${fieldP}, ${sigP}] (${matchCount} matches)`, "");
+            const matched = overrideMatchedTypes.get(t.typeName) || [];
+            lines.push(`### \`${t.typeName}\` ✅ [${ifaceP}, ${fieldP}, ${sigP}] (${matched.length} matches)`, "");
+            for (const m of matched) {
+                lines.push(`- ${m.sourceProperty}, ${m.sourceInterface}, ${rustToTs(m.sourceFile || '?')} — ~~\`${m.typeName}\`~~`);
+            }
+            lines.push("");
         }
     }
 

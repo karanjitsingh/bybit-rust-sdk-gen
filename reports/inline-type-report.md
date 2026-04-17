@@ -4,7 +4,27 @@
 
 ### `Side` ✅ [*, *, 'Buy' | 'Sell'] (12 matches)
 
+- side, ContractSetAutoAddMarginRequest, types/request/contract.ts — ~~`ContractSetAutoAddMarginRequest_Side`~~
+- side, MovePositionParamsV5_List, types/request/v5-position.ts — ~~`MovePositionParamsV5_List_Side`~~
+- side, SubmitSpreadOrderParamsV5, types/request/v5-spreadtrading.ts — ~~`SubmitSpreadOrderParamsV5_Side`~~
+- side, MovePositionHistoryV5, types/response/v5-position.ts — ~~`MovePositionHistoryV5_Side`~~
+- side, ClosedOptionsPositionV5, types/response/v5-position.ts — ~~`ClosedOptionsPositionV5_Side`~~
+- side, PreUpgradeOptionsDelivery, types/response/v5-preupgrade.ts — ~~`PreUpgradeOptionsDelivery_Side`~~
+- side, PreUpgradeUSDCSessionSettlement, types/response/v5-preupgrade.ts — ~~`PreUpgradeUSDCSessionSettlement_Side`~~
+- side, SpreadRecentTradeV5, types/response/v5-spreadtrading.ts — ~~`SpreadRecentTradeV5_Side`~~
+- side, SpreadOpenOrderV5, types/response/v5-spreadtrading.ts — ~~`SpreadOpenOrderV5_Side`~~
+- side, SpreadOrderHistoryV5, types/response/v5-spreadtrading.ts — ~~`SpreadOrderHistoryV5_Side`~~
+- side, SpreadTradeLegV5, types/response/v5-spreadtrading.ts — ~~`SpreadTradeLegV5_Side`~~
+- side, SpreadTradeV5, types/response/v5-spreadtrading.ts — ~~`SpreadTradeV5_Side`~~
+
 ### `RfqSide` ✅ [*RFQ*, *, 'buy' | 'sell'] (6 matches)
+
+- side, RFQTransactionV5, types/request/v5-rfq.ts — ~~`RFQTransactionV5_Side`~~
+- quoteSide, ExecuteRFQQuoteParamsV5, types/request/v5-rfq.ts — ~~`ExecuteRFQQuoteParamsV5_QuoteSide`~~
+- side, RFQLegV5, types/response/v5-rfq.ts — ~~`RFQLegV5_Side`~~
+- side, RFQTradeLegV5, types/response/v5-rfq.ts — ~~`RFQTradeLegV5_Side`~~
+- quoteSide, RFQTradeV5, types/response/v5-rfq.ts — ~~`RFQTradeV5_QuoteSide`~~
+- side, RFQPublicTradeLegV5, types/response/v5-rfq.ts — ~~`RFQPublicTradeLegV5_Side`~~
 
 ## Shared signatures without overrides (38, candidates for shared-types.json)
 
