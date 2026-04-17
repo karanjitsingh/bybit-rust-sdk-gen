@@ -4,3 +4,4 @@
 [submodule "bybit-rust-sdk"]
 	path = bybit-rust-sdk
 	url = https://github.com/karanjitsingh/bybit-rust-sdk
+	branch = master
