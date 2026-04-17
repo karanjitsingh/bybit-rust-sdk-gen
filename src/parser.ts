@@ -931,8 +931,9 @@ const resolvedInlineTypes = inlineTypeRegistry.getAllInlineTypes();
     }
 
     uniqueTypes.sort((a, b) => a.signature.localeCompare(b.signature));
-    lines.push(`## Unique inline types (${uniqueTypes.length}, single definition)`, "");
-    for (const t of uniqueTypes) {
+    const uniqueNonOverridden = uniqueTypes.filter(t => !overrideNames.has(t.typeName));
+    lines.push(`## Unique inline types (${uniqueNonOverridden.length}, single definition)`, "");
+    for (const t of uniqueNonOverridden) {
         lines.push(`- \`${t.signature}\` → \`${t.typeName}\` — ${t.sourceProperty}, ${t.sourceInterface}, ${rustToTs(t.sourceFile || '?')}`);
     }
 

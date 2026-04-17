@@ -289,7 +289,7 @@
 - memberType, CreateSubMemberResponseV3, types/response/account-asset.ts
 - memberType, SubMemberV3, types/response/account-asset.ts
 
-## Unique inline types (36, single definition)
+## Unique inline types (34, single definition)
 
 - `'' | 'Full' | 'Partial'` → `AccountOrderV5_TpslMode` — tpslMode, AccountOrderV5, types/response/v5-trade.ts
 - `'' | 'iv' | 'price'` → `AccountOrderV5_PlaceType` — placeType, AccountOrderV5, types/response/v5-trade.ts
@@ -304,8 +304,6 @@
 - `'BothSide' | 'MergedSingle'` → `LinearSetPositionModeRequest_Mode` — mode, LinearSetPositionModeRequest, types/request/linear.ts
 - `'BTC' | 'ETH' | 'USDC' | 'USDT'` → `PreUpgradeTransaction_Currency` — currency, PreUpgradeTransaction, types/response/v5-preupgrade.ts
 - `'Buy' | 'None' | 'Sell'` → `PreUpgradeTransaction_Side` — side, PreUpgradeTransaction, types/response/v5-preupgrade.ts
-- `'buy' | 'sell'` → `RfqSide` — side, RFQTransactionV5, types/shared.ts
-- `'Buy' | 'Sell'` → `Side` — side, ContractSetAutoAddMarginRequest, types/shared.ts
 - `'Cancelled' | 'Filled' | 'Rejected'` → `SpreadOrderHistoryV5_OrderStatus` — orderStatus, SpreadOrderHistoryV5, types/response/v5-spreadtrading.ts
 - `'connectionReady' | 'connectionReadyForAuth' | 'pong' | TEventType` → `EmittableEvent_EventType` — eventType, EmittableEvent, util/mod.ts
 - `'Counterparty' | 'Queue'` → `OrderParamsV5_BboSideType` — bboSideType, OrderParamsV5, types/request/v5-trade.ts
