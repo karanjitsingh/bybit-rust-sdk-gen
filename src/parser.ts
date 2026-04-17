@@ -781,7 +781,7 @@ const inlineTypesByFile = new Map<string, typeof inlineTypes>();
 
 // Load shared type overrides
 const sharedTypesPath = path.join(path.dirname(GEN_DIR), "..", "shared-types.json");
-const sharedTypeOverrides: Record<string, string> = fs.existsSync(sharedTypesPath)
+const sharedTypeOverrides: Record<string, [string, string, string]> = fs.existsSync(sharedTypesPath)
     ? JSON.parse(fs.readFileSync(sharedTypesPath, "utf8"))
     : {};
 const overrideCount = Object.keys(sharedTypeOverrides).length;
@@ -789,50 +789,72 @@ if (overrideCount > 0) {
     console.info(`\nLoaded ${overrideCount} shared type overrides from shared-types.json`);
 }
 
-// Apply overrides: promote matching signatures to shared types
-// Renames: old per-struct name → shared name (applied at write time)
+// Glob-style matching: * matches any substring
+function globMatch(pattern: string, value: string): boolean {
+    const regex = new RegExp('^' + pattern.split('*').map(s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('.*') + '$', 'i');
+    return regex.test(value);
+}
+
+// Apply overrides: promote matching types to shared
 const typeRenames = new Map<string, string>();
+const overrideMatches = new Map<string, number>(); // track match count per override
 {
-    // Group inline types by signature
-    const bySignature = new Map<string, typeof inlineTypes>();
-    for (const t of inlineTypes) {
-        if (!bySignature.has(t.signature)) bySignature.set(t.signature, []);
-        bySignature.get(t.signature)!.push(t);
+    for (const sharedName of Object.keys(sharedTypeOverrides)) {
+        overrideMatches.set(sharedName, 0);
     }
 
-    for (const [sig, sharedName] of Object.entries(sharedTypeOverrides)) {
-        const types = bySignature.get(sig);
-        if (!types || types.length === 0) {
-            console.warn(`  ⚠️  Override "${sig}" → "${sharedName}" matches no inline types`);
-            continue;
+    for (const [sharedName, [ifacePattern, fieldPattern, sigPattern]] of Object.entries(sharedTypeOverrides)) {
+        const matched: typeof inlineTypes = [];
+
+        for (const t of inlineTypes) {
+            if (globMatch(sigPattern, t.signature)
+                && globMatch(ifacePattern, t.sourceInterface || '')
+                && globMatch(fieldPattern, t.sourceProperty || '')) {
+                matched.push(t);
+            }
         }
 
-        console.info(`  → Override: "${sig}" → ${sharedName} (${types.length} types)`);
+        overrideMatches.set(sharedName, matched.length);
 
-        // Collect all source files
+        if (matched.length === 0) continue;
+
+        console.info(`  → Override: ${sharedName} (${matched.length} matches)`);
+
         const allFiles = new Set<string>();
-        for (const t of types) {
+        for (const t of matched) {
             if (t.sourceFile) allFiles.add(t.sourceFile);
         }
 
-        // Create the shared type (based on first type's data)
-        const first = types[0];
+        const first = matched[0];
         const sharedType: typeof inlineTypes[0] = {
             ...first,
             typeName: sharedName,
-            signature: sig,
+            signature: first.signature,
             sourceFile: "types/shared.rs",
             usedInFiles: allFiles,
         };
 
-        // Remove per-struct entries, record renames
-        for (const t of types) {
+        for (const t of matched) {
             inlineTypeRegistry.removeType(t.typeName);
             typeRenames.set(t.typeName, sharedName);
         }
 
-        // Add the shared type
         inlineTypeRegistry.addType(sharedType);
+    }
+
+    // Error on overrides that never matched
+    const errors: string[] = [];
+    for (const [name, count] of overrideMatches) {
+        if (count === 0) {
+            const [ifacePattern, fieldPattern, sigPattern] = sharedTypeOverrides[name];
+            errors.push(`Override "${name}" [${ifacePattern}, ${fieldPattern}, ${sigPattern}] matched no inline types`);
+        }
+    }
+    if (errors.length > 0) {
+        for (const err of errors) {
+            console.error(`  ✗ ${err}`);
+        }
+        throw new Error(`${errors.length} shared type override(s) matched nothing — fix or remove them from shared-types.json`);
     }
 }
 
@@ -856,19 +878,24 @@ const resolvedInlineTypes = inlineTypeRegistry.getAllInlineTypes();
     const uniqueTypes = [...bySignature.entries()].filter(([, types]) => types.length === 1)
         .map(([, types]) => types[0]);
 
-    // Overridden signatures
-    const overriddenSigs = sharedSigs.filter(([sig]) => sig in sharedTypeOverrides);
-    const candidateSigs = sharedSigs.filter(([sig]) => !(sig in sharedTypeOverrides));
+    const overrideNames = new Set(Object.keys(sharedTypeOverrides));
 
-    if (overriddenSigs.length > 0) {
-        lines.push(`## Overridden shared types (${overriddenSigs.length})`, "");
-        for (const [sig, types] of overriddenSigs) {
-            const sharedName = sharedTypeOverrides[sig];
-            lines.push(`### \`${sig}\` → \`${sharedName}\` ✅ (${types.length} definitions)`, "");
-            for (const t of types) {
-                lines.push(`- ${t.sourceProperty}, ${t.sourceInterface}, ${rustToTs(t.sourceFile || '?')} — ~~\`${t.typeName}\`~~`);
-            }
-            lines.push("");
+    // Overridden types appear as single entries with the shared name
+    const overriddenTypes = resolvedInlineTypes.filter(t => overrideNames.has(t.typeName));
+    // Shared sigs that aren't overridden
+    const candidateSigs = sharedSigs.filter(([sig]) => {
+        const types = bySignature.get(sig)!;
+        return !types.some(t => overrideNames.has(t.typeName));
+    });
+
+    if (overriddenTypes.length > 0) {
+        lines.push(`## Overridden shared types (${overriddenTypes.length})`, "");
+        for (const t of overriddenTypes) {
+            const [ifaceP, fieldP, sigP] = sharedTypeOverrides[t.typeName];
+            const matchCount = typeRenames.size > 0
+                ? [...typeRenames.values()].filter(v => v === t.typeName).length
+                : 0;
+            lines.push(`### \`${t.typeName}\` ✅ [${ifaceP}, ${fieldP}, ${sigP}] (${matchCount} matches)`, "");
         }
     }
 
@@ -913,7 +940,7 @@ const resolvedInlineTypes = inlineTypeRegistry.getAllInlineTypes();
     fs.mkdirSync(path.dirname(reportPath), { recursive: true });
     fs.writeFileSync(reportPath, lines.join("\n"));
     console.info(`\nInline type report: ${reportPath}`);
-    console.info(`  ${overriddenSigs.length} overridden, ${candidateSigs.length} candidates, ${uniqueTypes.length} unique`);
+    console.info(`  ${overriddenTypes.length} overridden, ${candidateSigs.length} candidates, ${uniqueTypes.length} unique`);
 }
 
 if (resolvedInlineTypes.length > 0) {

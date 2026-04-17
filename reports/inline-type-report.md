@@ -1,6 +1,12 @@
 # Inline Type Report
 
-## Shared signatures without overrides (40, candidates for shared-types.json)
+## Overridden shared types (2)
+
+### `Side` ✅ [*, *, 'Buy' | 'Sell'] (12 matches)
+
+### `RfqSide` ✅ [*RFQ*, *, 'buy' | 'sell'] (6 matches)
+
+## Shared signatures without overrides (38, candidates for shared-types.json)
 
 ### String literals
 
@@ -68,30 +74,6 @@
 
 - itemType, CreateP2PAdParamsV5, types/request/v5-p2p-trading.ts
 - itemType, UpdateP2PAdParamsV5, types/request/v5-p2p-trading.ts
-
-#### `'buy' | 'sell'` (6 definitions)
-
-- side, RFQTransactionV5, types/request/v5-rfq.ts
-- quoteSide, ExecuteRFQQuoteParamsV5, types/request/v5-rfq.ts
-- side, RFQLegV5, types/response/v5-rfq.ts
-- side, RFQTradeLegV5, types/response/v5-rfq.ts
-- quoteSide, RFQTradeV5, types/response/v5-rfq.ts
-- side, RFQPublicTradeLegV5, types/response/v5-rfq.ts
-
-#### `'Buy' | 'Sell'` (12 definitions)
-
-- side, ContractSetAutoAddMarginRequest, types/request/contract.ts
-- side, MovePositionParamsV5_List, types/request/v5-position.ts
-- side, SubmitSpreadOrderParamsV5, types/request/v5-spreadtrading.ts
-- side, MovePositionHistoryV5, types/response/v5-position.ts
-- side, ClosedOptionsPositionV5, types/response/v5-position.ts
-- side, PreUpgradeOptionsDelivery, types/response/v5-preupgrade.ts
-- side, PreUpgradeUSDCSessionSettlement, types/response/v5-preupgrade.ts
-- side, SpreadRecentTradeV5, types/response/v5-spreadtrading.ts
-- side, SpreadOpenOrderV5, types/response/v5-spreadtrading.ts
-- side, SpreadOrderHistoryV5, types/response/v5-spreadtrading.ts
-- side, SpreadTradeLegV5, types/response/v5-spreadtrading.ts
-- side, SpreadTradeV5, types/response/v5-spreadtrading.ts
 
 #### `'Call' | 'Put'` (2 definitions)
 
@@ -307,7 +289,7 @@
 - memberType, CreateSubMemberResponseV3, types/response/account-asset.ts
 - memberType, SubMemberV3, types/response/account-asset.ts
 
-## Unique inline types (34, single definition)
+## Unique inline types (36, single definition)
 
 - `'' | 'Full' | 'Partial'` → `AccountOrderV5_TpslMode` — tpslMode, AccountOrderV5, types/response/v5-trade.ts
 - `'' | 'iv' | 'price'` → `AccountOrderV5_PlaceType` — placeType, AccountOrderV5, types/response/v5-trade.ts
@@ -322,6 +304,8 @@
 - `'BothSide' | 'MergedSingle'` → `LinearSetPositionModeRequest_Mode` — mode, LinearSetPositionModeRequest, types/request/linear.ts
 - `'BTC' | 'ETH' | 'USDC' | 'USDT'` → `PreUpgradeTransaction_Currency` — currency, PreUpgradeTransaction, types/response/v5-preupgrade.ts
 - `'Buy' | 'None' | 'Sell'` → `PreUpgradeTransaction_Side` — side, PreUpgradeTransaction, types/response/v5-preupgrade.ts
+- `'buy' | 'sell'` → `RfqSide` — side, RFQTransactionV5, types/shared.ts
+- `'Buy' | 'Sell'` → `Side` — side, ContractSetAutoAddMarginRequest, types/shared.ts
 - `'Cancelled' | 'Filled' | 'Rejected'` → `SpreadOrderHistoryV5_OrderStatus` — orderStatus, SpreadOrderHistoryV5, types/response/v5-spreadtrading.ts
 - `'connectionReady' | 'connectionReadyForAuth' | 'pong' | TEventType` → `EmittableEvent_EventType` — eventType, EmittableEvent, util/mod.ts
 - `'Counterparty' | 'Queue'` → `OrderParamsV5_BboSideType` — bboSideType, OrderParamsV5, types/request/v5-trade.ts
