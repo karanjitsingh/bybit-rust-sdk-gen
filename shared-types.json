@@ -1,4 +1,15 @@
 {
   "Side": ["*", "*", "'Buy' | 'Sell'"],
-  "RfqSide": ["*RFQ*", "*", "'buy' | 'sell'"]
+  "RfqSide": ["*RFQ*", "*", "'buy' | 'sell'"],
+  "CategoryInverseLinear": ["*", "*", "'inverse' | 'linear'"],
+  "CategoryInverseLinearSpot": ["*", "*", "'inverse' | 'linear' | 'spot'"],
+  "CategoryInverseLinearOptionSpot": ["*", "*", "'inverse' | 'linear' | 'option' | 'spot'"],
+  "CategoryLinearOptionSpot": ["*", "*", "'linear' | 'option' | 'spot'"],
+  "TpslMode": ["*", "*", "'Full' | 'Partial'"],
+  "OptionType": ["*", "*", "'Call' | 'Put'"],
+  "OrderType": ["*", "*", "'Limit' | 'Market'"],
+  "TimeInForce": ["*", "*", "'FOK' | 'GTC' | 'IOC' | 'PostOnly'"],
+  "MarketUnit": ["*", "*", "'baseCoin' | 'quoteCoin'"],
+  "TriggerBy": ["*", "*", "'IndexPrice' | 'LastPrice' | 'MarkPrice'"],
+  "BooleanString": ["*", "*", "'0' | '1'"]
 }

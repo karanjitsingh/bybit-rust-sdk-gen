@@ -1,6 +1,6 @@
 # Inline Type Report
 
-## Overridden shared types (2)
+## Overridden shared types (13)
 
 ### `Side` ✅ [*, *, 'Buy' | 'Sell'] (12 matches)
 
@@ -26,7 +26,105 @@
 - RFQTradeV5.quoteSide, types/response/v5-rfq.ts — ~~`RFQTradeV5_QuoteSide`~~
 - RFQPublicTradeLegV5.side, types/response/v5-rfq.ts — ~~`RFQPublicTradeLegV5_Side`~~
 
-## Shared signatures without overrides (38, candidates for shared-types.json)
+### `CategoryInverseLinear` ✅ [*, *, 'inverse' | 'linear'] (17 matches)
+
+- GetMarkPriceKlineParamsV5.category, types/request/v5-market.ts — ~~`GetMarkPriceKlineParamsV5_Category`~~
+- GetIndexPriceKlineParamsV5.category, types/request/v5-market.ts — ~~`GetIndexPriceKlineParamsV5_Category`~~
+- GetFundingRateHistoryParamsV5.category, types/request/v5-market.ts — ~~`GetFundingRateHistoryParamsV5_Category`~~
+- GetOpenInterestParamsV5.category, types/request/v5-market.ts — ~~`GetOpenInterestParamsV5_Category`~~
+- GetRiskLimitParamsV5.category, types/request/v5-market.ts — ~~`GetRiskLimitParamsV5_Category`~~
+- GetLongShortRatioParamsV5.category, types/request/v5-market.ts — ~~`GetLongShortRatioParamsV5_Category`~~
+- SetLeverageParamsV5.category, types/request/v5-position.ts — ~~`SetLeverageParamsV5_Category`~~
+- SwitchIsolatedMarginParamsV5.category, types/request/v5-position.ts — ~~`SwitchIsolatedMarginParamsV5_Category`~~
+- SetTPSLModeParamsV5.category, types/request/v5-position.ts — ~~`SetTPSLModeParamsV5_Category`~~
+- SwitchPositionModeParamsV5.category, types/request/v5-position.ts — ~~`SwitchPositionModeParamsV5_Category`~~
+- SetRiskLimitParamsV5.category, types/request/v5-position.ts — ~~`SetRiskLimitParamsV5_Category`~~
+- AddOrReduceMarginParamsV5.category, types/request/v5-position.ts — ~~`AddOrReduceMarginParamsV5_Category`~~
+- ConfirmNewRiskLimitParamsV5.category, types/request/v5-position.ts — ~~`ConfirmNewRiskLimitParamsV5_Category`~~
+- GetPreUpgradeOrderHistoryParamsV5.category, types/request/v5-pre-upgrade.ts — ~~`GetPreUpgradeOrderHistoryParamsV5_Category`~~
+- GetPreUpgradeTradeHistoryParamsV5.category, types/request/v5-pre-upgrade.ts — ~~`GetPreUpgradeTradeHistoryParamsV5_Category`~~
+- GetPreUpgradeClosedPnlParamsV5.category, types/request/v5-pre-upgrade.ts — ~~`GetPreUpgradeClosedPnlParamsV5_Category`~~
+- OpenInterestResponseV5.category, types/response/v5-market.ts — ~~`OpenInterestResponseV5_Category`~~
+
+### `CategoryInverseLinearSpot` ✅ [*, *, 'inverse' | 'linear' | 'spot'] (3 matches)
+
+- GetAccountInstrumentsInfoParamsV5.category, types/request/v5-account.ts — ~~`GetAccountInstrumentsInfoParamsV5_Category`~~
+- GetKlineParamsV5.category, types/request/v5-market.ts — ~~`GetKlineParamsV5_Category`~~
+- GetRPIOrderbookParamsV5.category, types/request/v5-market.ts — ~~`GetRPIOrderbookParamsV5_Category`~~
+
+### `CategoryInverseLinearOptionSpot` ✅ [*, *, 'inverse' | 'linear' | 'option' | 'spot'] (3 matches)
+
+- MovePositionParamsV5_List.category, types/request/v5-position.ts — ~~`MovePositionParamsV5_List_Category`~~
+- RFQTransactionV5.category, types/request/v5-rfq.ts — ~~`RFQTransactionV5_Category`~~
+- WsTopicRequest.category, util/mod.ts — ~~`WsTopicRequest_Category`~~
+
+### `CategoryLinearOptionSpot` ✅ [*, *, 'linear' | 'option' | 'spot'] (7 matches)
+
+- GetMovePositionHistoryParamsV5.category, types/request/v5-position.ts — ~~`GetMovePositionHistoryParamsV5_Category`~~
+- RFQQuoteV5.category, types/request/v5-rfq.ts — ~~`RFQQuoteV5_Category`~~
+- MovePositionHistoryV5.category, types/response/v5-position.ts — ~~`MovePositionHistoryV5_Category`~~
+- RFQLegV5.category, types/response/v5-rfq.ts — ~~`RFQLegV5_Category`~~
+- QuoteLegV5.category, types/response/v5-rfq.ts — ~~`QuoteLegV5_Category`~~
+- RFQTradeLegV5.category, types/response/v5-rfq.ts — ~~`RFQTradeLegV5_Category`~~
+- RFQPublicTradeLegV5.category, types/response/v5-rfq.ts — ~~`RFQPublicTradeLegV5_Category`~~
+
+### `TpslMode` ✅ [*, *, 'Full' | 'Partial'] (8 matches)
+
+- ContractOrderRequest.tpslMode, types/request/contract.ts — ~~`ContractOrderRequest_TpslMode`~~
+- ContractSetTPSLRequest.tpslMode, types/request/contract.ts — ~~`ContractSetTPSLRequest_TpslMode`~~
+- InverseSetSlTpPositionModeRequest.tp_sl_mode, types/request/inverse.ts — ~~`InverseSetSlTpPositionModeRequest_TpSlMode`~~
+- LinearSetPositionTpSlModeRequest.tp_sl_mode, types/request/linear.ts — ~~`LinearSetPositionTpSlModeRequest_TpSlMode`~~
+- OrderParamsV5.tpslMode, types/request/v5-trade.ts — ~~`OrderParamsV5_TpslMode`~~
+- AmendOrderParamsV5.tpslMode, types/request/v5-trade.ts — ~~`AmendOrderParamsV5_TpslMode`~~
+- BatchOrderParamsV5.tpslMode, types/request/v5-trade.ts — ~~`BatchOrderParamsV5_TpslMode`~~
+- BatchAmendOrderParamsV5.tpslMode, types/request/v5-trade.ts — ~~`BatchAmendOrderParamsV5_TpslMode`~~
+
+### `OptionType` ✅ [*, *, 'Call' | 'Put'] (2 matches)
+
+- UMPublicTradesRequest.optionType, types/request/unified-margin.ts — ~~`UMPublicTradesRequest_OptionType`~~
+- USDCOptionsRecentTradesRequest.optionType, types/request/usdc-options.ts — ~~`USDCOptionsRecentTradesRequest_OptionType`~~
+
+### `OrderType` ✅ [*, *, 'Limit' | 'Market'] (3 matches)
+
+- SubmitSpreadOrderParamsV5.orderType, types/request/v5-spreadtrading.ts — ~~`SubmitSpreadOrderParamsV5_OrderType`~~
+- SpreadOpenOrderV5.orderType, types/response/v5-spreadtrading.ts — ~~`SpreadOpenOrderV5_OrderType`~~
+- SpreadOrderHistoryV5.orderType, types/response/v5-spreadtrading.ts — ~~`SpreadOrderHistoryV5_OrderType`~~
+
+### `TimeInForce` ✅ [*, *, 'FOK' | 'GTC' | 'IOC' | 'PostOnly'] (3 matches)
+
+- SubmitSpreadOrderParamsV5.timeInForce, types/request/v5-spreadtrading.ts — ~~`SubmitSpreadOrderParamsV5_TimeInForce`~~
+- SpreadOpenOrderV5.timeInForce, types/response/v5-spreadtrading.ts — ~~`SpreadOpenOrderV5_TimeInForce`~~
+- SpreadOrderHistoryV5.timeInForce, types/response/v5-spreadtrading.ts — ~~`SpreadOrderHistoryV5_TimeInForce`~~
+
+### `MarketUnit` ✅ [*, *, 'baseCoin' | 'quoteCoin'] (3 matches)
+
+- OrderParamsV5.marketUnit, types/request/v5-trade.ts — ~~`OrderParamsV5_MarketUnit`~~
+- AccountOrderV5.marketUnit, types/response/v5-trade.ts — ~~`AccountOrderV5_MarketUnit`~~
+- WSAccountOrderV5.marketUnit, types/websockets/ws-events.ts — ~~`WSAccountOrderV5_MarketUnit`~~
+
+### `TriggerBy` ✅ [*, *, 'IndexPrice' | 'LastPrice' | 'MarkPrice'] (2 matches)
+
+- InverseOrderRequest.tp_trigger_by, types/request/inverse.ts — ~~`InverseOrderRequest_TpTriggerBy`~~
+- InverseOrderRequest.sl_trigger_by, types/request/inverse.ts — ~~`InverseOrderRequest_SlTriggerBy`~~
+
+### `BooleanString` ✅ [*, *, '0' | '1'] (14 matches)
+
+- SingleAccountCoinBalanceRequestV3.withBonus, types/request/account-asset.ts — ~~`SingleAccountCoinBalanceRequestV3_WithBonus`~~
+- AccountCoinBalancesRequestV3.withBonus, types/request/account-asset.ts — ~~`AccountCoinBalancesRequestV3_WithBonus`~~
+- AdjustCollateralAmountParamsV5.direction, types/request/v5-crypto-loan.ts — ~~`AdjustCollateralAmountParamsV5_Direction`~~
+- GetP2POnlineAdsParamsV5.side, types/request/v5-p2p-trading.ts — ~~`GetP2POnlineAdsParamsV5_Side`~~
+- CreateP2PAdParamsV5.side, types/request/v5-p2p-trading.ts — ~~`CreateP2PAdParamsV5_Side`~~
+- CreateP2PAdParamsV5.priceType, types/request/v5-p2p-trading.ts — ~~`CreateP2PAdParamsV5_PriceType`~~
+- UpdateP2PAdParamsV5.priceType, types/request/v5-p2p-trading.ts — ~~`UpdateP2PAdParamsV5_PriceType`~~
+- GetP2PPersonalAdsParamsV5.side, types/request/v5-p2p-trading.ts — ~~`GetP2PPersonalAdsParamsV5_Side`~~
+- SetAutoRepayModeParamsV5.autoRepayMode, types/request/v5-spot-leverage-token.ts — ~~`SetAutoRepayModeParamsV5_AutoRepayMode`~~
+- SpotInstrumentInfoV5.innovation, types/response/v5-market.ts — ~~`SpotInstrumentInfoV5_Innovation`~~
+- SpotInstrumentInfoV5.stTag, types/response/v5-market.ts — ~~`SpotInstrumentInfoV5_StTag`~~
+- SpotMarginStateV5.spotMarginMode, types/response/v5-spot-leverage-token.ts — ~~`SpotMarginStateV5_SpotMarginMode`~~
+- AutoRepayModeItemV5.autoRepayMode, types/response/v5-spot-leverage-token.ts — ~~`AutoRepayModeItemV5_AutoRepayMode`~~
+- AccountOrderV5.isLeverage, types/response/v5-trade.ts — ~~`AccountOrderV5_Leverage`~~
+
+## Shared signatures without overrides (27, candidates for shared-types.json)
 
 ### String literals
 
@@ -34,23 +132,6 @@
 
 - MovePositionResultV5.rejectParty, types/response/v5-position.ts → `MovePositionResultV5_RejectParty`
 - MovePositionHistoryV5.rejectParty, types/response/v5-position.ts → `MovePositionHistoryV5_RejectParty`
-
-#### `'0' | '1'` (14 definitions)
-
-- SingleAccountCoinBalanceRequestV3.withBonus, types/request/account-asset.ts → `SingleAccountCoinBalanceRequestV3_WithBonus`
-- AccountCoinBalancesRequestV3.withBonus, types/request/account-asset.ts → `AccountCoinBalancesRequestV3_WithBonus`
-- AdjustCollateralAmountParamsV5.direction, types/request/v5-crypto-loan.ts → `AdjustCollateralAmountParamsV5_Direction`
-- GetP2POnlineAdsParamsV5.side, types/request/v5-p2p-trading.ts → `GetP2POnlineAdsParamsV5_Side`
-- CreateP2PAdParamsV5.side, types/request/v5-p2p-trading.ts → `CreateP2PAdParamsV5_Side`
-- CreateP2PAdParamsV5.priceType, types/request/v5-p2p-trading.ts → `CreateP2PAdParamsV5_PriceType`
-- UpdateP2PAdParamsV5.priceType, types/request/v5-p2p-trading.ts → `UpdateP2PAdParamsV5_PriceType`
-- GetP2PPersonalAdsParamsV5.side, types/request/v5-p2p-trading.ts → `GetP2PPersonalAdsParamsV5_Side`
-- SetAutoRepayModeParamsV5.autoRepayMode, types/request/v5-spot-leverage-token.ts → `SetAutoRepayModeParamsV5_AutoRepayMode`
-- SpotInstrumentInfoV5.innovation, types/response/v5-market.ts → `SpotInstrumentInfoV5_Innovation`
-- SpotInstrumentInfoV5.stTag, types/response/v5-market.ts → `SpotInstrumentInfoV5_StTag`
-- SpotMarginStateV5.spotMarginMode, types/response/v5-spot-leverage-token.ts → `SpotMarginStateV5_SpotMarginMode`
-- AutoRepayModeItemV5.autoRepayMode, types/response/v5-spot-leverage-token.ts → `AutoRepayModeItemV5_AutoRepayMode`
-- AccountOrderV5.isLeverage, types/response/v5-trade.ts → `AccountOrderV5_Leverage`
 
 #### `'0' | '1' | '2'` (2 definitions)
 
@@ -84,21 +165,10 @@
 - GetSupplyOrderQuoteFixedParamsV5.orderBy, types/request/v5-crypto-loan.ts → `GetSupplyOrderQuoteFixedParamsV5_OrderBy`
 - GetBorrowOrderQuoteFixedParamsV5.orderBy, types/request/v5-crypto-loan.ts → `GetBorrowOrderQuoteFixedParamsV5_OrderBy`
 
-#### `'baseCoin' | 'quoteCoin'` (3 definitions)
-
-- OrderParamsV5.marketUnit, types/request/v5-trade.ts → `OrderParamsV5_MarketUnit`
-- AccountOrderV5.marketUnit, types/response/v5-trade.ts → `AccountOrderV5_MarketUnit`
-- WSAccountOrderV5.marketUnit, types/websockets/ws-events.ts → `WSAccountOrderV5_MarketUnit`
-
 #### `'BULK' | 'ORIGIN'` (2 definitions)
 
 - CreateP2PAdParamsV5.itemType, types/request/v5-p2p-trading.ts → `CreateP2PAdParamsV5_ItemType`
 - UpdateP2PAdParamsV5.itemType, types/request/v5-p2p-trading.ts → `UpdateP2PAdParamsV5_ItemType`
-
-#### `'Call' | 'Put'` (2 definitions)
-
-- UMPublicTradesRequest.optionType, types/request/unified-margin.ts → `UMPublicTradesRequest_OptionType`
-- USDCOptionsRecentTradesRequest.optionType, types/request/usdc-options.ts → `USDCOptionsRecentTradesRequest_OptionType`
 
 #### `'CarryTrade' | 'FundingRateArb' | 'FutureSpread' | 'PerpBasis'` (2 definitions)
 
@@ -146,23 +216,6 @@
 - GetRFQTradeListParamsV5.status, types/request/v5-rfq.ts → `GetRFQTradeListParamsV5_Status`
 - RFQTradeV5.status, types/response/v5-rfq.ts → `RFQTradeV5_Status`
 
-#### `'FOK' | 'GTC' | 'IOC' | 'PostOnly'` (3 definitions)
-
-- SubmitSpreadOrderParamsV5.timeInForce, types/request/v5-spreadtrading.ts → `SubmitSpreadOrderParamsV5_TimeInForce`
-- SpreadOpenOrderV5.timeInForce, types/response/v5-spreadtrading.ts → `SpreadOpenOrderV5_TimeInForce`
-- SpreadOrderHistoryV5.timeInForce, types/response/v5-spreadtrading.ts → `SpreadOrderHistoryV5_TimeInForce`
-
-#### `'Full' | 'Partial'` (8 definitions)
-
-- ContractOrderRequest.tpslMode, types/request/contract.ts → `ContractOrderRequest_TpslMode`
-- ContractSetTPSLRequest.tpslMode, types/request/contract.ts → `ContractSetTPSLRequest_TpslMode`
-- InverseSetSlTpPositionModeRequest.tp_sl_mode, types/request/inverse.ts → `InverseSetSlTpPositionModeRequest_TpSlMode`
-- LinearSetPositionTpSlModeRequest.tp_sl_mode, types/request/linear.ts → `LinearSetPositionTpSlModeRequest_TpSlMode`
-- OrderParamsV5.tpslMode, types/request/v5-trade.ts → `OrderParamsV5_TpslMode`
-- AmendOrderParamsV5.tpslMode, types/request/v5-trade.ts → `AmendOrderParamsV5_TpslMode`
-- BatchOrderParamsV5.tpslMode, types/request/v5-trade.ts → `BatchOrderParamsV5_TpslMode`
-- BatchAmendOrderParamsV5.tpslMode, types/request/v5-trade.ts → `BatchAmendOrderParamsV5_TpslMode`
-
 #### `'FUND' | 'UNIFIED'` (2 definitions)
 
 - SubmitStakeRedeemParamsV5.accountType, types/request/v5-earn.ts → `SubmitStakeRedeemParamsV5_AccountType`
@@ -172,59 +225,6 @@
 
 - SpreadOrderHistoryV5.leg1ProdType, types/response/v5-spreadtrading.ts → `SpreadOrderHistoryV5_Leg1ProdType`
 - SpreadOrderHistoryV5.leg2ProdType, types/response/v5-spreadtrading.ts → `SpreadOrderHistoryV5_Leg2ProdType`
-
-#### `'IndexPrice' | 'LastPrice' | 'MarkPrice'` (2 definitions)
-
-- InverseOrderRequest.tp_trigger_by, types/request/inverse.ts → `InverseOrderRequest_TpTriggerBy`
-- InverseOrderRequest.sl_trigger_by, types/request/inverse.ts → `InverseOrderRequest_SlTriggerBy`
-
-#### `'inverse' | 'linear'` (17 definitions)
-
-- GetMarkPriceKlineParamsV5.category, types/request/v5-market.ts → `GetMarkPriceKlineParamsV5_Category`
-- GetIndexPriceKlineParamsV5.category, types/request/v5-market.ts → `GetIndexPriceKlineParamsV5_Category`
-- GetFundingRateHistoryParamsV5.category, types/request/v5-market.ts → `GetFundingRateHistoryParamsV5_Category`
-- GetOpenInterestParamsV5.category, types/request/v5-market.ts → `GetOpenInterestParamsV5_Category`
-- GetRiskLimitParamsV5.category, types/request/v5-market.ts → `GetRiskLimitParamsV5_Category`
-- GetLongShortRatioParamsV5.category, types/request/v5-market.ts → `GetLongShortRatioParamsV5_Category`
-- SetLeverageParamsV5.category, types/request/v5-position.ts → `SetLeverageParamsV5_Category`
-- SwitchIsolatedMarginParamsV5.category, types/request/v5-position.ts → `SwitchIsolatedMarginParamsV5_Category`
-- SetTPSLModeParamsV5.category, types/request/v5-position.ts → `SetTPSLModeParamsV5_Category`
-- SwitchPositionModeParamsV5.category, types/request/v5-position.ts → `SwitchPositionModeParamsV5_Category`
-- SetRiskLimitParamsV5.category, types/request/v5-position.ts → `SetRiskLimitParamsV5_Category`
-- AddOrReduceMarginParamsV5.category, types/request/v5-position.ts → `AddOrReduceMarginParamsV5_Category`
-- ConfirmNewRiskLimitParamsV5.category, types/request/v5-position.ts → `ConfirmNewRiskLimitParamsV5_Category`
-- GetPreUpgradeOrderHistoryParamsV5.category, types/request/v5-pre-upgrade.ts → `GetPreUpgradeOrderHistoryParamsV5_Category`
-- GetPreUpgradeTradeHistoryParamsV5.category, types/request/v5-pre-upgrade.ts → `GetPreUpgradeTradeHistoryParamsV5_Category`
-- GetPreUpgradeClosedPnlParamsV5.category, types/request/v5-pre-upgrade.ts → `GetPreUpgradeClosedPnlParamsV5_Category`
-- OpenInterestResponseV5.category, types/response/v5-market.ts → `OpenInterestResponseV5_Category`
-
-#### `'inverse' | 'linear' | 'option' | 'spot'` (3 definitions)
-
-- MovePositionParamsV5_List.category, types/request/v5-position.ts → `MovePositionParamsV5_List_Category`
-- RFQTransactionV5.category, types/request/v5-rfq.ts → `RFQTransactionV5_Category`
-- WsTopicRequest.category, util/mod.ts → `WsTopicRequest_Category`
-
-#### `'inverse' | 'linear' | 'spot'` (3 definitions)
-
-- GetAccountInstrumentsInfoParamsV5.category, types/request/v5-account.ts → `GetAccountInstrumentsInfoParamsV5_Category`
-- GetKlineParamsV5.category, types/request/v5-market.ts → `GetKlineParamsV5_Category`
-- GetRPIOrderbookParamsV5.category, types/request/v5-market.ts → `GetRPIOrderbookParamsV5_Category`
-
-#### `'Limit' | 'Market'` (3 definitions)
-
-- SubmitSpreadOrderParamsV5.orderType, types/request/v5-spreadtrading.ts → `SubmitSpreadOrderParamsV5_OrderType`
-- SpreadOpenOrderV5.orderType, types/response/v5-spreadtrading.ts → `SpreadOpenOrderV5_OrderType`
-- SpreadOrderHistoryV5.orderType, types/response/v5-spreadtrading.ts → `SpreadOrderHistoryV5_OrderType`
-
-#### `'linear' | 'option' | 'spot'` (7 definitions)
-
-- GetMovePositionHistoryParamsV5.category, types/request/v5-position.ts → `GetMovePositionHistoryParamsV5_Category`
-- RFQQuoteV5.category, types/request/v5-rfq.ts → `RFQQuoteV5_Category`
-- MovePositionHistoryV5.category, types/response/v5-position.ts → `MovePositionHistoryV5_Category`
-- RFQLegV5.category, types/response/v5-rfq.ts → `RFQLegV5_Category`
-- QuoteLegV5.category, types/response/v5-rfq.ts → `QuoteLegV5_Category`
-- RFQTradeLegV5.category, types/response/v5-rfq.ts → `RFQTradeLegV5_Category`
-- RFQPublicTradeLegV5.category, types/response/v5-rfq.ts → `RFQPublicTradeLegV5_Category`
 
 #### `'Processing' | 'Rejected'` (2 definitions)
 
