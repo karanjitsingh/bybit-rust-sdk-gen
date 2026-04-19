@@ -168,7 +168,7 @@ impl BaseRestClient {
             .map_err(|e| ClientError::HttpError(e.to_string()))?;
 
         let json: Value = serde_json::from_str(&body_text)
-            .map_err(|e| ClientError::SerializationError(e.to_string()))?;
+            .map_err(|_| ClientError::SerializationError(body_text.clone()))?;
 
         if !status.is_success() {
             return Err(ClientError::HttpError(format!("HTTP {}: {}", status, body_text)));

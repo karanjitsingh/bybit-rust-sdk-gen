@@ -468,7 +468,7 @@ function generateRustMethod(
     // Check if return type needs deserialization
     if (returnType !== "serde_json::Value" && returnType !== "()") {
       // Need to deserialize the response
-      body = `${callExpr}.and_then(|v| serde_json::from_value(v).map_err(|e| crate::client::ClientError::SerializationError(e.to_string())))`;
+      body = `${callExpr}.and_then(|v| serde::Deserialize::deserialize(&v).map_err(|_| crate::client::ClientError::SerializationError(v.to_string())))`;
     } else if (returnType === "()") {
       // void return — discard the response value
       body = `${callExpr}.map(|_| ())`;
