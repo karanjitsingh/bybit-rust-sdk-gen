@@ -294,7 +294,7 @@ project.getSourceFiles().forEach(sourceFile => {
                         } else if (defaultTypeText === 'string') {
                             rustDefault = 'String';
                         } else if (defaultTypeText === 'number') {
-                            rustDefault = 'f64';
+                            rustDefault = 'Number';
                         } else if (defaultTypeText === 'boolean') {
                             rustDefault = 'bool';
                         } else if (defaultTypeText.endsWith('[]')) {

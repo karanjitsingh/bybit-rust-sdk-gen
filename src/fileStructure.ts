@@ -89,6 +89,13 @@ export class FileStructure {
             content += `\n`;
         }
 
+        // `Number` is a hand-written shared type under crate::client.
+        if (/\bNumber\b/.test(fullContent) &&
+            !fullContent.includes("use crate::client::Number;") &&
+            !this.imports.has("use crate::client::Number;")) {
+            content += `use crate::client::Number;\n`;
+        }
+
         // Add imports for dependencies
         const currentModulePath = rustFileToModulePath(this.filePath);
         const currentInlineModulePath = `${currentModulePath}::inline`;
@@ -234,8 +241,8 @@ export class FileStructure {
                         rustType = "String";
                         variantName = "StringValue";
                     } else if (variant === "number") {
-                        rustType = "f64";
-                        variantName = "Number";
+                        rustType = "Number";
+                        variantName = "NumberValue";
                     } else if (variant === "boolean") {
                         rustType = "bool";
                         variantName = "Boolean";
@@ -307,6 +314,12 @@ export class FileStructure {
         if (needsStrum) {
             content += `    use strum_macros::{EnumString, Display};\n`;
         }
+        const inlineNeedsNumber = this.inlineTypes.some(inlineType =>
+            inlineType.variants.some((variant: string) => variant === "number")
+        );
+        if (inlineNeedsNumber) {
+            content += `    use crate::client::Number;\n`;
+        }
         content += `\n`;
 
         for (const inlineType of this.inlineTypes) {
@@ -344,8 +357,8 @@ export class FileStructure {
                         rustType = "String";
                         variantName = "StringValue";
                     } else if (variant === "number") {
-                        rustType = "f64";
-                        variantName = "Number";
+                        rustType = "Number";
+                        variantName = "NumberValue";
                     } else if (variant === "boolean") {
                         rustType = "bool";
                         variantName = "Boolean";

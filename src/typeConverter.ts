@@ -27,7 +27,7 @@ export class TypeConverter {
 
         // Handle primitives
         if (type.isString() || type.isStringLiteral()) return "String";
-        if (type.isNumber() || type.isNumberLiteral()) return "f64";
+        if (type.isNumber() || type.isNumberLiteral()) return "Number";
         if (type.isBoolean() || type.isBooleanLiteral()) return "bool";
         if (typeText === "null" || typeText === "undefined") return "Option<serde_json::Value>";
         if (typeText === "any") {

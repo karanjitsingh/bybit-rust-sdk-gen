@@ -1,6 +1,6 @@
 //! Fetch public market data from Bybit V5 API (no API key needed)
 
-use bybit_rust_sdk::client::BaseRestClient;
+use bybit_rust_sdk::client::{BaseRestClient, Number};
 use bybit_rust_sdk::client::RestClientV5::RestClientV5;
 use bybit_rust_sdk::client::config::ClientConfig;
 use bybit_rust_sdk::types::request::v5_market::{
@@ -29,7 +29,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .get_orderbook(GetOrderbookParamsV5 {
             category: CategoryV5::spot,
             symbol: "BTCUSDT".into(),
-            limit: Some(5.0),
+            limit: Some(Number::from(5_u64)),
         })
         .await?;
     println!("\nOrderbook: {}", serde_json::to_string_pretty(&orderbook)?);

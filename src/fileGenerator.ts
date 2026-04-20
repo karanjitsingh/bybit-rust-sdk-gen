@@ -89,6 +89,11 @@ export class FileGenerator {
             fileContent += `\n`;
         }
 
+        // `Number` is hand-written in the client module and reused by generated contracts.
+        if (/\bNumber\b/.test(typeContent) && !typeContent.includes("use crate::client::Number;")) {
+            fileContent += `use crate::client::Number;\n`;
+        }
+
         // Add imports only for types that are actually referenced in the content
         const deps = this.registry.getFileDependencies(rustFilePath);
         
@@ -158,6 +163,12 @@ export class FileGenerator {
             if (needsStrumForInline) {
                 fileContent += `    use strum_macros::{EnumString, Display};\n`;
             }
+            const inlineNeedsNumber = inlineTypes.some(inlineType =>
+                inlineType.variants.some((variant: string) => variant === "number")
+            );
+            if (inlineNeedsNumber) {
+                fileContent += `    use crate::client::Number;\n`;
+            }
             fileContent += `\n`;
 
             for (const inlineType of inlineTypes) {
@@ -190,8 +201,8 @@ export class FileGenerator {
                             rustType = "String";
                             variantName = "StringValue";
                         } else if (variant === "number") {
-                            rustType = "f64";
-                            variantName = "Number";
+                            rustType = "Number";
+                            variantName = "NumberValue";
                         } else if (variant === "boolean") {
                             rustType = "bool";
                             variantName = "Boolean";
@@ -323,7 +334,7 @@ pub mod signing;
 // Base client modules and re-exports (hand-written, not generated)
 #[path = "BaseRestClient.rs"]
 mod base_rest_client;
-pub use base_rest_client::BaseRestClient;
+pub use base_rest_client::{BaseRestClient, Number};
 
 #[path = "BaseWebsocketClient.rs"]
 mod base_websocket_client;

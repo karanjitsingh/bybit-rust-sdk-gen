@@ -190,7 +190,7 @@ export function convertTypeAlias(typeName: string, typeNode: Node, jsDocs: JSDoc
     if (typeText === 'string' || typeText === 'number' || typeText === 'boolean') {
         // Generate struct wrapper
         const innerType = typeText === 'string' ? 'String' : 
-                          typeText === 'number' ? 'f64' : 
+                          typeText === 'number' ? 'Number' : 
                           'bool';
         
         // Add JSDoc comments
@@ -225,7 +225,7 @@ export function convertTypeAlias(typeName: string, typeNode: Node, jsDocs: JSDoc
             if (elementText === 'string') {
                 rustType = 'String';
             } else if (elementText === 'number') {
-                rustType = 'f64';
+                rustType = 'Number';
             } else if (elementText === 'boolean') {
                 rustType = 'bool';
             } else if (elementText.endsWith('[]')) {
@@ -234,7 +234,7 @@ export function convertTypeAlias(typeName: string, typeNode: Node, jsDocs: JSDoc
                 if (innerType === 'string') {
                     rustType = 'Vec<String>';
                 } else if (innerType === 'number') {
-                    rustType = 'Vec<f64>';
+                    rustType = 'Vec<Number>';
                 } else {
                     rustType = `Vec<${innerType}>`;
                 }
@@ -285,7 +285,7 @@ export function convertTypeAlias(typeName: string, typeNode: Node, jsDocs: JSDoc
                     if (propTypeText === 'string') {
                         rustType = 'String';
                     } else if (propTypeText === 'number') {
-                        rustType = 'f64';
+                        rustType = 'Number';
                     } else if (propTypeText === 'boolean') {
                         rustType = 'bool';
                     } else if (propTypeText.endsWith('[]')) {
@@ -293,7 +293,7 @@ export function convertTypeAlias(typeName: string, typeNode: Node, jsDocs: JSDoc
                         if (innerType === 'string') {
                             rustType = 'Vec<String>';
                         } else if (innerType === 'number') {
-                            rustType = 'Vec<f64>';
+                            rustType = 'Vec<Number>';
                         } else if (innerType === 'boolean') {
                             rustType = 'Vec<bool>';
                         } else {
@@ -364,7 +364,7 @@ export function convertTypeAlias(typeName: string, typeNode: Node, jsDocs: JSDoc
                 return "String";
             }
             if (arg === "string") return "String";
-            if (arg === "number") return "f64";
+            if (arg === "number") return "Number";
             if (arg === "boolean") return "bool";
             if (arg.endsWith("[]")) {
                 const inner = convertGenericArg(arg.slice(0, -2).trim());

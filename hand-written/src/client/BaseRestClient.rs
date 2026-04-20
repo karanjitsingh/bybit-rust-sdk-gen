@@ -2,9 +2,45 @@ use crate::client::{BybitApiError, ClientError, ClientResult};
 use crate::client::config::ClientConfig;
 use crate::client::signing::{build_sign_string, get_timestamp_ms, serialize_params_for_signing, sign_hmac_sha256};
 use reqwest::{Client, Method};
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::fmt;
 use std::sync::Arc;
 use tokio::sync::Mutex;
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+#[serde(untagged)]
+pub enum Number {
+    F64(f64),
+    U64(u64),
+}
+
+impl From<f64> for Number {
+    fn from(value: f64) -> Self {
+        Number::F64(value)
+    }
+}
+
+impl From<u64> for Number {
+    fn from(value: u64) -> Self {
+        Number::U64(value)
+    }
+}
+
+impl fmt::Display for Number {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Number::F64(value) => write!(f, "{}", value),
+            Number::U64(value) => write!(f, "{}", value),
+        }
+    }
+}
+
+impl Default for Number {
+    fn default() -> Self {
+        Number::U64(0)
+    }
+}
 
 pub struct BaseRestClient {
     config: ClientConfig,
